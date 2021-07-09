@@ -24,6 +24,7 @@ import (
 
 	"github.com/ledgerwatch/erigon/common"
 	cmath "github.com/ledgerwatch/erigon/common/math"
+	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
 	"github.com/ledgerwatch/erigon/params"
@@ -40,8 +41,8 @@ The state transitioning model does all the necessary work to work out a valid ne
 3) Create a new state object if the recipient is \0*32
 4) Value transfer
 == If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
+	4a) Attempt to run transaction data
+	4b) If valid, use result as code for the new state object
 == end ==
 5) Run Script section
 6) Derive new state root
@@ -339,7 +340,13 @@ func (st *StateTransition) TransitionDb(refunds bool, gasBailout bool) (*Executi
 	if st.evm.ChainRules.IsLondon {
 		effectiveTip = cmath.Min256(st.tip, new(uint256.Int).Sub(st.feeCap, st.evm.Context.BaseFee))
 	}
-	st.state.AddBalance(st.evm.Context.Coinbase, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), effectiveTip))
+
+	// consensus engine is parlia
+	if st.evm.ChainConfig().Parlia != nil {
+		st.state.AddBalance(consensus.SystemAddress, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), effectiveTip))
+	} else {
+		st.state.AddBalance(st.evm.Context.Coinbase, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), effectiveTip))
+	}
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

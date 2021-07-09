@@ -29,6 +29,7 @@ import (
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/consensus/misc"
 	"github.com/ledgerwatch/erigon/core/state"
+	"github.com/ledgerwatch/erigon/core/systemcontracts"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
 	"github.com/ledgerwatch/erigon/log"
@@ -114,8 +115,29 @@ func ExecuteBlockEphemerally(
 	if chainConfig.DAOForkSupport && chainConfig.DAOForkBlock != nil && chainConfig.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(ibs)
 	}
+	// Handle upgrade build-in system contract code
+	systemcontracts.UpgradeBuildInSystemContract(chainConfig, block.Number(), ibs)
+
+	posa, isPoSA := engine.(consensus.PoSA)
+
+	userTxs := make([]*types.Transaction, 0, len(block.Transactions()))
+	// usually do have two tx, one for validator set contract, another for system reward contract.
+	systemTxs := make([]*types.Transaction, 0, 2)
+
 	noop := state.NewNoopWriter()
+
 	for i, tx := range block.Transactions() {
+		if isPoSA {
+			if isSystemTx, err := posa.IsSystemTransaction(&tx, block.Header()); err != nil {
+				return nil, err
+			} else if isSystemTx {
+				systemTxs = append(systemTxs, &tx)
+				continue
+			} else {
+				userTxs = append(userTxs, &tx)
+			}
+		}
+
 		ibs.Prepare(tx.Hash(), block.Hash(), i)
 		writeTrace := false
 		if vmConfig.Debug && vmConfig.Tracer == nil {
@@ -164,7 +186,7 @@ func ExecuteBlockEphemerally(
 		}
 	}
 	if !vmConfig.ReadOnly {
-		if err := FinalizeBlockExecution(engine, block.Header(), block.Transactions(), block.Uncles(), stateWriter, chainConfig, ibs); err != nil {
+		if err := FinalizeBlockExecution(engine, block.Header(), userTxs, block.Uncles(), stateWriter, chainConfig, ibs, receipts, systemTxs, usedGas); err != nil {
 			return nil, err
 		}
 	}
@@ -183,6 +205,8 @@ func SysCallContract(contract common.Address, data []byte, chainConfig params.Ch
 	if chainConfig.DAOForkSupport && chainConfig.DAOForkBlock != nil && chainConfig.DAOForkBlock.Cmp(header.Number) == 0 {
 		misc.ApplyDAOHardFork(ibs)
 	}
+	// Handle upgrade build-in system contract code
+	systemcontracts.UpgradeBuildInSystemContract(&chainConfig, header.Number, ibs)
 
 	noop := state.NewNoopWriter()
 	tx, err := SysCallContractTx(contract, data, ibs)
@@ -259,11 +283,11 @@ func CallContractTx(contract common.Address, data []byte, ibs *state.IntraBlockS
 	return tx.FakeSign(from)
 }
 
-func FinalizeBlockExecution(engine consensus.Engine, header *types.Header, txs types.Transactions, uncles []*types.Header, stateWriter state.WriterWithChangeSets, cc *params.ChainConfig, ibs *state.IntraBlockState) error {
+func FinalizeBlockExecution(engine consensus.Engine, header *types.Header, txs []*types.Transaction, uncles []*types.Header, stateWriter state.WriterWithChangeSets, cc *params.ChainConfig, ibs *state.IntraBlockState, receipts []*types.Receipt, systemTxs []*types.Transaction, gasUsed *uint64) error {
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	engine.Finalize(cc, header, ibs, txs, uncles, func(contract common.Address, data []byte) ([]byte, error) {
 		return CallContract(contract, data, *cc, ibs, header, engine)
-	})
+	}, receipts, systemTxs, gasUsed)
 
 	if err := ibs.CommitBlock(cc.Rules(header.Number.Uint64()), stateWriter); err != nil {
 		return fmt.Errorf("committing block %d failed: %v", header.Number.Uint64(), err)

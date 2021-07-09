@@ -33,11 +33,13 @@ import (
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/consensus/clique"
+	"github.com/ledgerwatch/erigon/consensus/parlia"
 	"github.com/ledgerwatch/erigon/consensus/db"
 	"github.com/ledgerwatch/erigon/consensus/ethash"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/eth/gasprice"
 	"github.com/ledgerwatch/erigon/ethdb"
+	"github.com/ledgerwatch/erigon/internal/ethapi"
 	"github.com/ledgerwatch/erigon/log"
 	"github.com/ledgerwatch/erigon/params"
 	"github.com/ledgerwatch/erigon/turbo/snapshotsync"
@@ -50,6 +52,7 @@ var FullNodeGPO = gasprice.Config{
 	Percentile:  60,
 	MaxPrice:    gasprice.DefaultMaxPrice,
 	IgnorePrice: gasprice.DefaultIgnorePrice,
+	OracleThreshold: 1000,
 }
 
 // LightClientGPO contains default gasprice oracle settings for light client.
@@ -151,7 +154,7 @@ type Config struct {
 	Miner params.MiningConfig
 
 	// Ethash options
-	Ethash ethash.Config
+	Ethash ethash.Config `toml:",omitempty"`
 
 	Clique params.SnapshotConfig
 	Aura   params.AuRaConfig
@@ -188,6 +191,7 @@ type Config struct {
 }
 
 func CreateConsensusEngine(chainConfig *params.ChainConfig, config interface{}, notify []string, noverify bool) consensus.Engine {
+func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, ee *ethapi.PublicBlockChainAPI, genesisHash common.Hash) consensus.Engine {
 	var eng consensus.Engine
 
 	switch consensusCfg := config.(type) {
@@ -216,6 +220,10 @@ func CreateConsensusEngine(chainConfig *params.ChainConfig, config interface{}, 
 	case *params.SnapshotConfig:
 		if chainConfig.Clique != nil {
 			eng = clique.New(chainConfig, consensusCfg, db.OpenDatabase(consensusCfg.DBPath, consensusCfg.InMemory))
+		}
+	case *params.ParliaConfig:
+		if chainConfig.Parlia != nil {
+			eng = parlia.New(chainConfig, db.OpenDatabase(consensusCfg.DBPath, consensusCfg.InMemory), ee, genesisHash)
 		}
 	case *params.AuRaConfig:
 		if chainConfig.Aura != nil {

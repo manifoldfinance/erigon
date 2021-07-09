@@ -23,6 +23,7 @@ import (
 	"github.com/ledgerwatch/erigon/common/math"
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/core/state"
+	// "github.com/ledgerwatch/erigon/core/systemcontracts"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
 	"github.com/ledgerwatch/erigon/crypto"
@@ -143,6 +144,15 @@ func ApplyTransaction(config *params.ChainConfig, getHeader func(hash common.Has
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, getHeader, engine, author, checkTEVM)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, ibs, config, cfg)
+
+	posa, isPoSA := engine.(consensus.PoSA)
+	if isPoSA {
+		isSystemTx, err := posa.IsSystemTransaction(&tx, header)
+		if isSystemTx || err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// Add addresses to access list if applicable
 	// about the transaction and calling mechanisms.
 	cfg.SkipAnalysis = SkipAnalysis(config, header.Number.Uint64())

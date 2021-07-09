@@ -111,7 +111,7 @@ func (args *TraceCallParam) ToMessage(globalGasCap uint64) types.Message {
 		gas = uint64(*args.Gas)
 	}
 	if globalGasCap != 0 && globalGasCap < gas {
-		log.Warn("Caller gas above allowance, capping", "requested", gas, "cap", globalGasCap)
+		log.Debug("Caller gas above allowance, capping", "requested", gas, "cap", globalGasCap)
 		gas = globalGasCap
 	}
 	gasPrice := new(uint256.Int)

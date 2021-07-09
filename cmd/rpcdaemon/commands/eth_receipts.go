@@ -263,6 +263,10 @@ func (api *APIImpl) GetTransactionReceipt(ctx context.Context, hash common.Hash)
 	return marshalReceipt(receipts[txIndex], block.Transactions()[txIndex], cc, block), nil
 }
 
+func (api *APIImpl) GetTransactionReceiptsByBlockNumber(ctx context.Context, number rpc.BlockNumber) ([]map[string]interface{}, error) {
+	return api.GetBlockReceipts(ctx, number)
+}
+
 // GetBlockReceipts - receipts for individual block
 func (api *APIImpl) GetBlockReceipts(ctx context.Context, number rpc.BlockNumber) ([]map[string]interface{}, error) {
 	tx, err := api.db.BeginRo(ctx)

@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/consensus"
@@ -49,11 +50,11 @@ func (c *powEngine) Prepare(chain consensus.ChainHeaderReader, header *types.Hea
 func (c *powEngine) Initialize(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []types.Transaction, uncles []*types.Header, syscall consensus.SystemCall) {
 	panic("must not be called")
 }
-func (c *powEngine) Finalize(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []types.Transaction, uncles []*types.Header, syscall consensus.SystemCall) {
+func (c *powEngine) Finalize(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, userTxs []*types.Transaction, uncles []*types.Header, syscall consensus.SystemCall, receipts []*types.Receipt, systemTxs []*types.Transaction, usedGas *uint64) error {
 	panic("must not be called")
 }
 func (c *powEngine) FinalizeAndAssemble(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []types.Transaction,
-	uncles []*types.Header, receipts []*types.Receipt, syscall consensus.SystemCall) (*types.Block, error) {
+	uncles []*types.Header, receipts []*types.Receipt, syscall consensus.SystemCall) (*types.Block, []*types.Receipt, error) {
 	panic("must not be called")
 }
 
@@ -72,6 +73,10 @@ func (c *powEngine) CalcDifficulty(chain consensus.ChainHeaderReader, time, pare
 	panic("must not be called")
 }
 func (c *powEngine) APIs(chain consensus.ChainHeaderReader) []rpc.API {
+	panic("must not be called")
+}
+
+func (c *powEngine) Delay(chain consensus.ChainHeaderReader, header *types.Header) *time.Duration {
 	panic("must not be called")
 }
 

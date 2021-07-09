@@ -134,6 +134,31 @@ func (api *APIImpl) GetRawTransactionByBlockHashAndIndex(ctx context.Context, bl
 	return newRPCRawTransactionFromBlockIndex(block, uint64(index))
 }
 
+// GetTransactionsByBlockNumber implements eth_getTransactionsByBlockNumber. Returns information about transactions given a block number.
+func (api *APIImpl) GetTransactionsByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber, txIndex hexutil.Uint) (*RPCTransaction, error) {
+	tx, err := api.db.BeginRo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// https://infura.io/docs/ethereum/json-rpc/eth-getTransactionByBlockNumberAndIndex
+	blockNum, err := getBlockNumber(blockNr, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := rawdb.ReadBlockByNumber(tx, blockNum)
+	if err != nil {
+		return nil, err
+	}
+	if block == nil {
+		return nil, nil // not error, see https://github.com/ledgerwatch/erigon/issues/1645
+	}
+
+	return newRPCTransactionsFromBlockIndex(block)
+}
+
 // GetTransactionByBlockNumberAndIndex implements eth_getTransactionByBlockNumberAndIndex. Returns information about a transaction given a block number and transaction index.
 func (api *APIImpl) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, txIndex hexutil.Uint) (*RPCTransaction, error) {
 	tx, err := api.db.BeginRo(ctx)

@@ -152,7 +152,7 @@ func (api *APIImpl) EstimateGas(ctx context.Context, args ethapi.CallArgs, block
 	}
 	// Recap the highest gas allowance with specified gascap.
 	if hi > api.GasCap {
-		log.Warn("Caller gas above allowance, capping", "requested", hi, "cap", api.GasCap)
+		log.Debug("Caller gas above allowance, capping", "requested", hi, "cap", api.GasCap)
 		hi = api.GasCap
 	}
 	cap = hi

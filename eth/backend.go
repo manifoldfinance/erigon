@@ -194,6 +194,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 
 	if chainConfig.Clique != nil {
 		consensusConfig = &config.Clique
+	} else if chainConfig.Parlia != nil {
+		consensusConfig = &config.Parlia
+	}
 	} else if chainConfig.Aura != nil {
 		config.Aura.Etherbase = config.Miner.Etherbase
 		consensusConfig = &config.Aura
@@ -201,7 +204,10 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		consensusConfig = &config.Ethash
 	}
 
-	backend.engine = ethconfig.CreateConsensusEngine(chainConfig, consensusConfig, config.Miner.Notify, config.Miner.Noverify)
+	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
+	ethAPI := ethapi.NewPublicBlockChainAPI(eth.APIBackend)
+
+	backend.engine = ethconfig.CreateConsensusEngine(chainConfig, consensusConfig, config.Miner.Notify, config.Miner.Noverify, ethAPI, genesisHash)
 
 	log.Info("Initialising Ethereum protocol", "network", config.NetworkID)
 
@@ -522,6 +528,9 @@ func (s *Ethereum) shouldPreserve(block *types.Block) bool { //nolint
 	// and in the round6, the last available signer B is offline, the whole
 	// network is stuck.
 	if _, ok := s.engine.(*clique.Clique); ok {
+		return false
+	}
+	if _, ok := s.engine.(*parlia.Parlia); ok {
 		return false
 	}
 	return s.isLocalBlock(block)

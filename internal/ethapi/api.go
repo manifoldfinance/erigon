@@ -353,7 +353,7 @@ func (args *CallArgs) ToMessage(globalGasCap uint64) types.Message {
 		gas = uint64(*args.Gas)
 	}
 	if globalGasCap != 0 && globalGasCap < gas {
-		log.Warn("Caller gas above allowance, capping", "requested", gas, "cap", globalGasCap)
+		log.Debug("Caller gas above allowance, capping", "requested", gas, "cap", globalGasCap)
 		gas = globalGasCap
 	}
 	gasPrice := new(uint256.Int)
@@ -600,7 +600,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 	}
 	// Recap the highest gas allowance with specified gascap.
 	if gasCap != 0 && hi > gasCap {
-		log.Warn("Caller gas above allowance, capping", "requested", hi, "cap", gasCap)
+		log.Debug("Caller gas above allowance, capping", "requested", hi, "cap", gasCap)
 		hi = gasCap
 	}
 	cap = hi
@@ -905,6 +905,17 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 		return nil
 	}
 	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), index)
+}
+
+// newRPCTransactionsFromBlockIndex returns transactions that will serialize to the RPC representation.
+func newRPCTransactionsFromBlockIndex(b *types.Block) []*RPCTransaction {
+	txs := b.Transactions()
+	result := make([]*RPCTransaction, 0, len(txs))
+
+	for idx, tx := range txs {
+		result = append(result, newRPCTransaction(tx, b.Hash(), b.NumberU64(), uint64(idx)))
+	}
+	return result
 }
 
 /*

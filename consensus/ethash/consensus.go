@@ -260,8 +260,8 @@ func (ethash *Ethash) VerifyUncle(chain consensus.ChainHeaderReader, header *typ
 // See YP section 4.3.4. "Block Header Validity"
 func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+	if uint64(len(header.Extra)) > params.MaximumExtraDataSize-params.ForkIDSize {
+		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize-params.ForkIDSize)
 	}
 	// Verify the header's timestamp
 	if !uncle {
@@ -601,19 +601,23 @@ func (ethash *Ethash) Initialize(config *params.ChainConfig, header *types.Heade
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state on the header
-func (ethash *Ethash) Finalize(config *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []types.Transaction, uncles []*types.Header, _ consensus.SystemCall) {
+func (ethash *Ethash) Finalize(config *params.ChainConfig, header *types.Header, state *state.IntraBlockState, userTxs []*types.Transaction, uncles []*types.Header, syscall consensus.SystemCall, receipts []*types.Receipt, _ []*types.Transaction, _ *uint64) (err error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(config, state, header, uncles)
+	return
 }
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and
 // uncle rewards, setting the final state and assembling the block.
-func (ethash *Ethash) FinalizeAndAssemble(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []types.Transaction, uncles []*types.Header, receipts []*types.Receipt, syscall consensus.SystemCall) (*types.Block, error) {
-
+func (ethash *Ethash) FinalizeAndAssemble(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, userTxs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, syscall consensus.SystemCall) (*types.Block, []*types.Receipt, error) {
 	// Finalize block
-	ethash.Finalize(chainConfig, header, state, txs, uncles, syscall)
+	ethash.Finalize(chainConfig, header, state, txs, uncles, syscall, nil, nil, nil)
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, receipts), nil
+	return types.NewBlock(header, txs, uncles, receipts), receipts, nil
+}
+
+func (ethash *Ethash) Delay(_ consensus.ChainHeaderReader, _ *types.Header) *time.Duration {
+	return nil
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
