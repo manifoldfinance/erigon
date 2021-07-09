@@ -76,8 +76,8 @@ func NewIDFromForks(forks []uint64, genesis common.Hash, head uint64) ID {
 	return ID{Hash: checksumToBytes(hash), Next: next}
 }
 
-func NextForkHash(config *params.ChainConfig, genesis common.Hash, head uint64) ID {
-	return NewIDFromForks(GatherForks(config), genesis, head)
+func NextForkHash(config *params.ChainConfig, genesis common.Hash, head uint64) [4]byte {
+	return NextForkHashFromForks(GatherForks(config), genesis, head)
 }
 
  func NextForkHashFromForks(forks []uint64, genesis common.Hash, head uint64) [4]byte {
@@ -100,7 +100,7 @@ func NextForkHash(config *params.ChainConfig, genesis common.Hash, head uint64) 
 	} else {
 		return checksumToBytes(checksumUpdate(hash, next))
 	}
- }
+}
 
 // NewFilter creates a filter that returns if a fork ID should be rejected or notI
 // based on the local chain's status.

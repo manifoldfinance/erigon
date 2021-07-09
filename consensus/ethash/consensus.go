@@ -601,7 +601,7 @@ func (ethash *Ethash) Initialize(config *params.ChainConfig, header *types.Heade
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state on the header
-func (ethash *Ethash) Finalize(config *params.ChainConfig, header *types.Header, state *state.IntraBlockState, userTxs []*types.Transaction, uncles []*types.Header, syscall consensus.SystemCall, receipts []*types.Receipt, _ []*types.Transaction, _ *uint64) (err error) {
+func (ethash *Ethash) Finalize(config *params.ChainConfig, header *types.Header, state *state.IntraBlockState, _ []*types.Transaction, uncles []*types.Header, syscall consensus.SystemCall, receipts []*types.Receipt, _ []*types.Transaction, _ *uint64) (err error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(config, state, header, uncles)
 	return
@@ -609,11 +609,11 @@ func (ethash *Ethash) Finalize(config *params.ChainConfig, header *types.Header,
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and
 // uncle rewards, setting the final state and assembling the block.
-func (ethash *Ethash) FinalizeAndAssemble(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, userTxs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, syscall consensus.SystemCall) (*types.Block, []*types.Receipt, error) {
+func (ethash *Ethash) FinalizeAndAssemble(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, userTxs []types.Transaction, uncles []*types.Header, receipts []*types.Receipt, syscall consensus.SystemCall) (*types.Block, []*types.Receipt, error) {
 	// Finalize block
-	ethash.Finalize(chainConfig, header, state, txs, uncles, syscall, nil, nil, nil)
+	ethash.Finalize(chainConfig, header, state, nil, uncles, syscall, nil, nil, nil)
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, receipts), receipts, nil
+	return types.NewBlock(header, userTxs, uncles, receipts), receipts, nil
 }
 
 func (ethash *Ethash) Delay(_ consensus.ChainHeaderReader, _ *types.Header) *time.Duration {

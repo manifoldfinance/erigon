@@ -903,6 +903,14 @@ func (bb *Body) DecodeRLP(s *rlp.Stream) error {
 	return s.ListEnd()
 }
 
+func NewBlock2(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt) *Block {
+	dupTxs := make(Transactions, len(txs))
+	for i, tx := range txs {
+		dupTxs[i] = *tx
+	}
+	return NewBlock(header, dupTxs, uncles, receipts)
+}
+
 // NewBlock creates a new block. The input data is copied,
 // changes to header and to the field values will not affect the
 // block.

@@ -3,7 +3,7 @@ package parlia
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
+	// "encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +18,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon"
 	"github.com/ledgerwatch/erigon/accounts/abi"
 	"github.com/ledgerwatch/erigon/common"
@@ -251,22 +252,22 @@ func New(
 		signatures:      signatures,
 		validatorSetABI: vABI,
 		slashABI:        sABI,
-		signer:          types.NewEIP155Signer(chainConfig.ChainID),
+		signer:          *types.MakeSigner(params.AllEthashProtocolChanges, 1),
 	}
 
 	return c
 }
 
-func (p *Parlia) IsSystemTransaction(tx *types.Transaction, header *types.Header) (bool, error) {
+func (p *Parlia) IsSystemTransaction(tx types.Transaction, header *types.Header) (bool, error) {
 	// deploy a contract
-	if tx.To() == nil {
+	if tx.GetTo() == nil {
 		return false, nil
 	}
-	sender, err := types.Sender(p.signer, tx)
+	sender, err := tx.Sender(p.signer)
 	if err != nil {
 		return false, errors.New("UnAuthorized transaction")
 	}
-	if sender == header.Coinbase && isToSystemContract(*tx.To()) && tx.GasPrice().Cmp(big.NewInt(0)) == 0 {
+	if sender == header.Coinbase && isToSystemContract(*tx.GetTo()) && tx.GetPrice().Cmp(uint256.NewInt(0)) == 0 {
 		return true, nil
 	}
 	return false, nil
@@ -640,18 +641,18 @@ func (p *Parlia) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, nor block
 // rewards given.
-func (p *Parlia) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.IntraBlockState, txs *[]types.Transaction,
-	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+func (p *Parlia) Finalize(config *params.ChainConfig, header *types.Header, state *state.IntraBlockState, userTxs []*types.Transaction,
+	uncles []*types.Header, receipts []*types.Receipt, systemTxs []*types.Transaction, usedGas *uint64) error {
 	// warn if not in majority fork
 	number := header.Number.Uint64()
-	snap, err := p.snapshot(chain, number-1, header.ParentHash, nil)
-	if err != nil {
-		panic(err)
-	}
+	// snap, err := p.snapshot(chain, number-1, header.ParentHash, nil)
+	// if err != nil {
+	// 	panic(err)
+	// }
 	nextForkHash := forkid.NextForkHash(p.chainConfig, p.genesisHash, number)
-	if !snap.isMajorityFork(hex.EncodeToString(nextForkHash[:])) {
-		log.Debug("there is a possible fork, and your client is not the majority. Please check...", "nextForkHash", hex.EncodeToString(nextForkHash[:]))
-	}
+	// if !snap.isMajorityFork(hex.EncodeToString(nextForkHash[:])) {
+	// 	log.Debug("there is a possible fork, and your client is not the majority. Please check...", "nextForkHash", hex.EncodeToString(nextForkHash[:]))
+	// }
 	// If the block is a epoch end block, verify the validator list
 	// The verification can only be done when the state is ready, it can't be done in VerifyHeader.
 	if header.Number.Uint64()%p.config.Epoch == 0 {
@@ -776,7 +777,7 @@ func (p *Parlia) Authorize(val common.Address, signFn SignerFn, signTxFn SignerT
 	p.signTxFn = signTxFn
 }
 
-func (p *Parlia) Delay(chain consensus.ChainReader, header *types.Header) *time.Duration {
+func (p *Parlia) Delay(chain consensus.ChainHeaderReader, header *types.Header) *time.Duration {
 	number := header.Number.Uint64()
 	snap, err := p.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
@@ -869,8 +870,8 @@ func (p *Parlia) EnoughDistance(chain consensus.ChainReader, header *types.Heade
 // CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
 // that a new block should have based on the previous blocks in the chain and the
 // current signer.
-func (p *Parlia) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
-	snap, err := p.snapshot(chain, parent.Number.Uint64(), parent.Hash(), nil)
+func (p *Parlia) CalcDifficulty(chain consensus.ChainHeaderReader, time, parentTime uint64, parentDifficulty *big.Int, parentNumber uint64, parentHash, parentUncleHash common.Hash, parentSeal []rlp.RawValue) *big.Int {
+	snap, err := p.snapshot(chain, parentNumber, parentHash, nil)
 	if err != nil {
 		return nil
 	}
