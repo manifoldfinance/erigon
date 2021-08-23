@@ -20,6 +20,7 @@ import (
 	"math/big"
 
 	"github.com/ledgerwatch/erigon/common"
+	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/core/types"
 )
 
@@ -158,14 +159,14 @@ func (p *Peer) announceTransactions() {
 			// If there's anything available to transfer, fire up an async writer
 			if len(pending) > 0 {
 				done = make(chan struct{})
-				go func() {
+				gopool.Submit(func() {
 					if err := p.sendPooledTransactionHashes(pending); err != nil {
 						fail <- err
 						return
 					}
 					close(done)
-					p.Log().Trace("Sent transaction announcements", "count", len(pending))
-				}()
+					// p.Log().Trace("Sent transaction announcements", "count", len(pending))
+				})
 			}
 		}
 		// Transfer goroutine may or may not have been started, listen for events

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/ledgerwatch/erigon/common/debug"
+	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/mclock"
 	"github.com/ledgerwatch/erigon/p2p/enode"
 	"github.com/ledgerwatch/erigon/p2p/netutil"
@@ -185,8 +186,13 @@ func newDialScheduler(config dialConfig, it enode.Iterator, setupFunc dialSetupF
 	d.lastStatsLog = d.clock.Now()
 	d.ctx, d.cancel = context.WithCancel(context.Background())
 	d.wg.Add(2)
-	go d.readNodes(it)
-	go d.loop(it)
+	gopool.Submit(func() {
+		d.readNodes(it)
+	})
+	gopool.Submit(
+		func() {
+			d.loop(it)
+		})
 	return d
 }
 
@@ -465,11 +471,11 @@ func (d *dialScheduler) startDial(task *dialTask) {
 	hkey := string(task.dest.ID().Bytes())
 	d.history.add(hkey, d.clock.Now().Add(dialHistoryExpiration))
 	d.dialing[task.dest.ID()] = task
-	go func() {
+	gopool.Submit(func() {
 		defer debug.LogPanic()
 		task.run(d)
 		d.doneCh <- task
-	}()
+	})
 }
 
 // A dialTask generated for each node that is dialed.
