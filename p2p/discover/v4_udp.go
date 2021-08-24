@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/ledgerwatch/erigon/common/debug"
+	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/crypto"
 	"github.com/ledgerwatch/erigon/p2p/discover/v4wire"
 	"github.com/ledgerwatch/erigon/p2p/enode"
@@ -504,7 +505,9 @@ func (t *UDPv4) loop() {
 			if contTimeouts > ntpFailureThreshold {
 				if time.Since(ntpWarnTime) >= ntpWarningCooldown {
 					ntpWarnTime = time.Now()
-					go checkClockDrift()
+					gopool.Submit(func() {
+						checkClockDrift()
+					})
 				}
 				contTimeouts = 0
 			}

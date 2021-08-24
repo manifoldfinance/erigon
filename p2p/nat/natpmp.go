@@ -24,6 +24,7 @@ import (
 
 	natpmp "github.com/jackpal/go-nat-pmp"
 	"github.com/ledgerwatch/erigon/common/debug"
+	"github.com/ledgerwatch/erigon/common/gopool"
 )
 
 // natPMPClient adapts the NAT-PMP protocol implementation so it conforms to
@@ -69,7 +70,7 @@ func discoverPMP() Interface {
 	found := make(chan *pmp, len(gws))
 	for i := range gws {
 		gw := gws[i]
-		go func() {
+		gopool.Submit(func() {
 			defer debug.LogPanic()
 			c := natpmp.NewClient(gw)
 			if _, err := c.GetExternalAddress(); err != nil {
@@ -77,7 +78,7 @@ func discoverPMP() Interface {
 			} else {
 				found <- &pmp{gw, c}
 			}
-		}()
+		})
 	}
 	// return the one that responds first.
 	// discovery needs to be quick, so we stop caring about

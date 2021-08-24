@@ -27,6 +27,7 @@ import (
 
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/bitutil"
+	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/metrics"
 	"github.com/ledgerwatch/erigon/p2p/rlpx"
 	"github.com/ledgerwatch/erigon/rlp"
@@ -144,7 +145,7 @@ func (t *rlpxTransport) doProtoHandshake(our *protoHandshake) (their *protoHands
 	// disconnects us early with a valid reason, we should return it
 	// as the error so it can be tracked elsewhere.
 	werr := make(chan error, 1)
-	go func() { werr <- Send(t, handshakeMsg, our) }()
+	gopool.Submit(func() { werr <- Send(t, handshakeMsg, our) })
 	if their, err = readProtocolHandshake(t); err != nil {
 		<-werr // make sure the write terminates too
 		return nil, err
