@@ -34,6 +34,7 @@ import (
 
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/debug"
+	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/mclock"
 	"github.com/ledgerwatch/erigon/crypto"
 	"github.com/ledgerwatch/erigon/event"
@@ -580,11 +581,11 @@ func (srv *Server) setupDiscovery() error {
 	if srv.NAT != nil {
 		if !realaddr.IP.IsLoopback() {
 			srv.loopWG.Add(1)
-			go func() {
+			gopool.Submit(func() {
 				defer debug.LogPanic()
 				nat.Map(srv.NAT, srv.quit, "udp", realaddr.Port, realaddr.Port, "ethereum discovery")
 				srv.loopWG.Done()
-			}()
+			})
 		}
 	}
 	srv.localnode.SetFallbackUDP(realaddr.Port)
@@ -692,11 +693,11 @@ func (srv *Server) setupListening() error {
 		srv.localnode.Set(enr.TCP(tcp.Port))
 		if !tcp.IP.IsLoopback() && srv.NAT != nil {
 			srv.loopWG.Add(1)
-			go func() {
+			gopool.Submit(func() {
 				defer debug.LogPanic()
 				nat.Map(srv.NAT, srv.quit, "tcp", tcp.Port, tcp.Port, "ethereum p2p")
 				srv.loopWG.Done()
-			}()
+			})
 		}
 	}
 
@@ -923,11 +924,11 @@ func (srv *Server) listenLoop() {
 			fd = newMeteredConn(fd, true, addr)
 			srv.log.Trace("Accepted connection", "addr", fd.RemoteAddr())
 		}
-		go func() {
+		gopool.Submit(func() {
 			defer debug.LogPanic()
 			srv.SetupConn(fd, inboundConn, nil)
 			slots <- struct{}{}
-		}()
+		})
 	}
 }
 
@@ -1053,7 +1054,9 @@ func (srv *Server) launchPeer(c *conn) *Peer {
 		// to the peer.
 		p.events = &srv.peerFeed
 	}
-	go srv.runPeer(p)
+	gopool.Submit(func() {
+		srv.runPeer(p)
+	})
 	return p
 }
 
