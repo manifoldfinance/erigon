@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ledgerwatch/erigon/common/gopool"
+
 	jsoniter "github.com/json-iterator/go"
 	"github.com/ledgerwatch/log/v3"
 )
@@ -100,7 +102,7 @@ func newHandler(connCtx context.Context, conn jsonWriter, idgen func() ID, reg *
 }
 
 // handleBatch executes all messages in a batch and returns the responses.
-func (h *handler) handleBatch(msgs []*jsonrpcMessage, stream *jsoniter.Stream) {
+func (h *handler) handleBatch(ctx context.Context, msgs []*jsonrpcMessage, stream *jsoniter.Stream) {
 	needWriteStream := false
 	if stream == nil {
 		stream = jsoniter.NewStream(jsoniter.ConfigDefault, nil, 4096)
@@ -155,7 +157,7 @@ func (h *handler) handleBatch(msgs []*jsonrpcMessage, stream *jsoniter.Stream) {
 		for i := range calls {
 			if calls[i].isSubscribe() {
 				// Force subscribe call to work in non-streaming mode
-				response := h.handleCallMsg(cp, calls[i], nil)
+				response := h.handleCallMsg(cp, ctx, calls[i], nil)
 				if response != nil {
 					b, _ := json.Marshal(response)
 					writeToStream(b)
@@ -171,12 +173,12 @@ func (h *handler) handleBatch(msgs []*jsonrpcMessage, stream *jsoniter.Stream) {
 				var response *jsonrpcMessage
 				if cb != nil && cb.streamable { // cb == nil: means no such method and this case is thread-safe
 					batchStream := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 4096)
-					response = h.handleCallMsg(cp, calls[i], batchStream)
+					response = h.handleCallMsg(cp, ctx, calls[i], batchStream)
 					if response == nil {
 						writeToStream(batchStream.Buffer())
 					}
 				} else {
-					response = h.handleCallMsg(cp, calls[i], stream)
+					response = h.handleCallMsg(cp, ctx, calls[i], stream)
 				}
 				// Marshal inside goroutine (parallel)
 				if response != nil {
@@ -204,7 +206,7 @@ func (h *handler) handleBatch(msgs []*jsonrpcMessage, stream *jsoniter.Stream) {
 }
 
 // handleMsg handles a single message.
-func (h *handler) handleMsg(msg *jsonrpcMessage, stream *jsoniter.Stream) {
+func (h *handler) handleMsg(ctx context.Context, msg *jsonrpcMessage, stream *jsoniter.Stream) {
 	if ok := h.handleImmediate(msg); ok {
 		return
 	}
@@ -214,7 +216,7 @@ func (h *handler) handleMsg(msg *jsonrpcMessage, stream *jsoniter.Stream) {
 			stream = jsoniter.NewStream(jsoniter.ConfigDefault, nil, 4096)
 			needWriteStream = true
 		}
-		answer := h.handleCallMsg(cp, msg, stream)
+		answer := h.handleCallMsg(cp, ctx, msg, stream)
 		h.addSubscriptions(cp.notifiers)
 		if answer != nil {
 			buffer, _ := json.Marshal(answer)
@@ -303,12 +305,12 @@ func (h *handler) cancelServerSubscriptions(err error) {
 // startCallProc runs fn in a new goroutine and starts tracking it in the h.calls wait group.
 func (h *handler) startCallProc(fn func(*callProc)) {
 	h.callWG.Add(1)
-	go func() {
+	gopool.Submit(func() {
 		ctx, cancel := context.WithCancel(h.rootCtx)
 		defer h.callWG.Done()
 		defer cancel()
 		fn(&callProc{ctx: ctx})
-	}()
+	})
 }
 
 // handleImmediate executes non-call messages. It returns false if the message is a
@@ -371,7 +373,7 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 }
 
 // handleCallMsg executes a call message and returns the answer.
-func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage, stream *jsoniter.Stream) *jsonrpcMessage {
+func (h *handler) handleCallMsg(ctx *callProc, reqCtx context.Context, msg *jsonrpcMessage, stream *jsoniter.Stream) *jsonrpcMessage {
 	start := time.Now()
 	switch {
 	case msg.isNotification():
@@ -383,6 +385,8 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage, stream *json
 		var ctx []interface{}
 		ctx = append(ctx, "method", msg.Method, "reqid", idForLog{msg.ID}, "t", time.Since(start))
 		if resp != nil && resp.Error != nil {
+			xForward := reqCtx.Value("X-Forwarded-For")
+			h.log.Warn("Served "+msg.Method, "reqid", idForLog{msg.ID}, "t", time.Since(start), "err", resp.Error.Message, "X-Forwarded-For", xForward)
 			ctx = append(ctx, "err", resp.Error.Message)
 			if resp.Error.Data != nil {
 				ctx = append(ctx, "errdata", resp.Error.Data)
