@@ -26,6 +26,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/debug"
+	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/mclock"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/types"
@@ -797,14 +798,15 @@ func (f *TxFetcher) scheduleFetches(timer *mclock.Timer, timeout chan struct{}, 
 			f.requests[peer] = &txRequest{hashes: hashes, time: f.clock.Now()}
 			//txRequestOutMeter.Mark(int64(len(hashes)))
 
-			go func(peer string, hashes []common.Hash) {
+			p := peer
+			gopool.Submit(func() {
 				// Try to fetch the transactions, but in case of a request
 				// failure (e.g. peer disconnected), reschedule the hashes.
-				if err := f.fetchTxs(peer, hashes); err != nil {
+				if err := f.fetchTxs(p, hashes); err != nil {
 					//txRequestFailMeter.Mark(int64(len(hashes)))
-					f.Drop(peer) //nolint:errcheck
+					f.Drop(p) //nolint:errcheck
 				}
-			}(peer, hashes)
+			})
 		}
 	})
 	// If a new request was fired, schedule a timeout timer
