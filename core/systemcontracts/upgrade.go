@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ledgerwatch/erigon/common"
+	"github.com/ledgerwatch/erigon/core/state"
+	"github.com/ledgerwatch/erigon/params"
+	"github.com/ledgerwatch/log/v3"
 )
 
 type UpgradeConfig struct {
@@ -24,7 +24,7 @@ type Upgrade struct {
 	Configs     []*UpgradeConfig
 }
 
-type upgradeHook func(blockNumber *big.Int, contractAddr common.Address, statedb *state.StateDB) error
+type upgradeHook func(blockNumber *big.Int, contractAddr common.Address, statedb *state.IntraBlockState) error
 
 const (
 	mainNet    = "Mainnet"
@@ -276,7 +276,7 @@ func init() {
 	}
 }
 
-func UpgradeBuildInSystemContract(config *params.ChainConfig, blockNumber *big.Int, statedb *state.StateDB) {
+func UpgradeBuildInSystemContract(config *params.ChainConfig, blockNumber *big.Int, statedb *state.IntraBlockState) {
 	if config == nil || blockNumber == nil || statedb == nil {
 		return
 	}
@@ -311,7 +311,7 @@ func UpgradeBuildInSystemContract(config *params.ChainConfig, blockNumber *big.I
 	*/
 }
 
-func applySystemContractUpgrade(upgrade *Upgrade, blockNumber *big.Int, statedb *state.StateDB, logger log.Logger) {
+func applySystemContractUpgrade(upgrade *Upgrade, blockNumber *big.Int, statedb *state.IntraBlockState, logger log.Logger) {
 	if upgrade == nil {
 		logger.Info("Empty upgrade config", "height", blockNumber.String())
 		return
