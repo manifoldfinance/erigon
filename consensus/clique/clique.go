@@ -517,6 +517,10 @@ func (c *Clique) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	}
 }
 
+func (c *Clique) Delay(_ consensus.ChainReader, _ *types.Header) *time.Duration {
+	return nil
+}
+
 // SealHash returns the hash of a block prior to it being sealed.
 func SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
