@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
@@ -54,7 +55,6 @@ func (c *powEngine) FinalizeAndAssemble(chainConfig *params.ChainConfig, header 
 	e consensus.EpochReader, h consensus.ChainHeaderReader, syscall consensus.SystemCall, call consensus.Call) (*types.Block, error) {
 	panic("must not be called")
 }
-
 func (c *powEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	panic("must not be called")
 }
@@ -71,6 +71,9 @@ func (c *powEngine) CalcDifficulty(chain consensus.ChainHeaderReader, time, pare
 }
 func (c *powEngine) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	panic("must not be called")
+}
+func (c *powEngine) Delay(_ consensus.ChainReader, _ *types.Header) *time.Duration {
+	return nil
 }
 
 func (c *powEngine) Close() error {
