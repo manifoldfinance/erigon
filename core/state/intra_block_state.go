@@ -32,6 +32,10 @@ import (
 	"github.com/ledgerwatch/log/v3"
 )
 
+const (
+	defaultNumOfSlots = 100
+)
+
 type revision struct {
 	id           int
 	journalIndex int

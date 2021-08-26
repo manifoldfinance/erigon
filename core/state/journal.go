@@ -46,7 +46,8 @@ type journal struct {
 // newJournal create a new initialized journal.
 func newJournal() *journal {
 	return &journal{
-		dirties: make(map[common.Address]int),
+		dirties: make(map[common.Address]int, defaultNumOfSlots),
+		entries: make([]journalEntry, 0, defaultNumOfSlots),
 	}
 }
 
@@ -252,7 +253,9 @@ func (ch accessListAddAccountChange) revert(s *IntraBlockState) {
 		(addr) at this point, since no storage adds can remain when come upon
 		a single (addr) change.
 	*/
-	s.accessList.DeleteAddress(*ch.address)
+	if s.accessList != nil {
+		s.accessList.DeleteAddress(*ch.address)
+	}
 }
 
 func (ch accessListAddAccountChange) dirtied() *common.Address {
@@ -260,7 +263,9 @@ func (ch accessListAddAccountChange) dirtied() *common.Address {
 }
 
 func (ch accessListAddSlotChange) revert(s *IntraBlockState) {
-	s.accessList.DeleteSlot(*ch.address, *ch.slot)
+	if s.accessList != nil {
+		s.accessList.DeleteSlot(*ch.address, *ch.slot)
+	}
 }
 
 func (ch accessListAddSlotChange) dirtied() *common.Address {

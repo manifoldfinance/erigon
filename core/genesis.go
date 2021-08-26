@@ -36,6 +36,7 @@ import (
 	"github.com/ledgerwatch/erigon/common/math"
 	"github.com/ledgerwatch/erigon/core/rawdb"
 	"github.com/ledgerwatch/erigon/core/state"
+	"github.com/ledgerwatch/erigon/core/systemcontracts"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/crypto"
 	"github.com/ledgerwatch/erigon/params"
@@ -196,6 +197,7 @@ func MustCommitGenesisBlock(db kv.RwDB, genesis *Genesis) (*params.ChainConfig, 
 
 func OverrideGenesisBlock(db kv.RwTx, genesis *Genesis) (*params.ChainConfig, *types.Block, error) {
 	stored, err := rawdb.ReadCanonicalHash(db, 0)
+	systemcontracts.GenesisHash = stored
 	if err != nil {
 		return nil, nil, err
 	}
@@ -216,6 +218,7 @@ func WriteGenesisBlock(db kv.RwTx, genesis *Genesis) (*params.ChainConfig, *type
 	}
 	// Just commit the new block if there is no stored genesis block.
 	stored, storedErr := rawdb.ReadCanonicalHash(db, 0)
+	systemcontracts.GenesisHash = stored
 	if storedErr != nil {
 		return nil, nil, storedErr
 	}
@@ -271,7 +274,9 @@ func WriteGenesisBlock(db kv.RwTx, genesis *Genesis) (*params.ChainConfig, *type
 	// Special case: don't change the existing config of a non-mainnet chain if no new
 	// config is supplied. These chains would get AllProtocolChanges (and a compat error)
 	// if we just continued here.
-	if genesis == nil && stored != params.MainnetGenesisHash {
+	// The full node of two BSC testnets may run without genesis file after been inited.
+	if genesis == nil && stored != params.MainnetGenesisHash &&
+		stored != params.ChapelGenesisHash && stored != params.RialtoGenesisHash && stored != params.BSCGenesisHash {
 		return storedcfg, storedBlock, nil
 	}
 	// Check config compatibility and write the config. Compatibility errors
@@ -303,6 +308,12 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.RinkebyChainConfig
 	case ghash == params.GoerliGenesisHash:
 		return params.GoerliChainConfig
+	case ghash == params.BSCGenesisHash:
+		return params.BSCChainConfig
+	case ghash == params.ChapelGenesisHash:
+		return params.ChapelChainConfig
+	case ghash == params.RialtoGenesisHash:
+		return params.RialtoChainConfig
 	case ghash == params.ErigonGenesisHash:
 		return params.ErigonChainConfig
 	case ghash == params.CalaverasGenesisHash:
