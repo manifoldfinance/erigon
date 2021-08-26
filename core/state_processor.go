@@ -142,7 +142,19 @@ func applyTransaction(config *params.ChainConfig, gp *GasPool, statedb *state.In
 func ApplyTransaction(config *params.ChainConfig, getHeader func(hash common.Hash, number uint64) *types.Header, engine consensus.Engine, author *common.Address, gp *GasPool, ibs *state.IntraBlockState, stateWriter state.StateWriter, header *types.Header, tx types.Transaction, usedGas *uint64, cfg vm.Config, contractHasTEVM func(contractHash common.Hash) (bool, error)) (*types.Receipt, []byte, error) {
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, getHeader, engine, author, contractHasTEVM)
+	posa, isPoSA := engine.(consensus.PoSA)
+	if isPoSA {
+		isSystemTx, err := posa.IsSystemTransaction(&tx, header)
+		if isSystemTx || err != nil {
+			return nil, nil, err
+		}
+	}
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, ibs, config, cfg)
+	defer func() {
+		ite := vmenv.Interpreter()
+		vm.EVMInterpreterPool.Put(ite)
+		vm.EvmPool.Put(vmenv)
+	}()
 	// Add addresses to access list if applicable
 	// about the transaction and calling mechanisms.
 	cfg.SkipAnalysis = SkipAnalysis(config, header.Number.Uint64())

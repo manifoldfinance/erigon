@@ -18,6 +18,7 @@ package vm
 
 import (
 	"hash"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ledgerwatch/erigon/common"
@@ -25,6 +26,12 @@ import (
 	"github.com/ledgerwatch/erigon/core/vm/stack"
 	"github.com/ledgerwatch/log/v3"
 )
+
+var EVMInterpreterPool = sync.Pool{
+	New: func() interface{} {
+		return &EVMInterpreter{}
+	},
+}
 
 // Config are the configuration options for the Interpreter
 type Config struct {
@@ -188,10 +195,11 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	// as every returning call will return new data anyway.
 	in.returnData = nil
 
+	// TODO  temporary fix for issue
 	// Don't bother with the execution if there's no code.
-	if len(contract.Code) == 0 {
-		return nil, nil
-	}
+	// if len(contract.Code) == 0 {
+	// 	return nil, nil
+	// }
 
 	var (
 		op          OpCode        // current opcode
@@ -319,7 +327,8 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// if the operation clears the return data (e.g. it has returning data)
 		// set the last return to the result of the operation.
 		if operation.returns {
-			in.returnData = common.CopyBytes(res)
+			// in.returnData = common.CopyBytes(res)
+			in.returnData = res
 		}
 
 		switch {
