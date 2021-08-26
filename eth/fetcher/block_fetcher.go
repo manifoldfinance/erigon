@@ -24,6 +24,7 @@ import (
 
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/debug"
+	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/prque"
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/core/types"
@@ -31,13 +32,14 @@ import (
 )
 
 const (
-	arriveTimeout = 500 * time.Millisecond // Time allowance before an announced block/transaction is explicitly requested
-	gatherSlack   = 100 * time.Millisecond // Interval used to collate almost-expired announces with fetches
-	fetchTimeout  = 5 * time.Second        // Maximum allotted time to return an explicitly requested block/transaction
+	arriveTimeout       = 500 * time.Millisecond // Time allowance before an announced block/transaction is explicitly requested
+	gatherSlack         = 100 * time.Millisecond // Interval used to collate almost-expired announces with fetches
+	fetchTimeout        = 5 * time.Second        // Maximum allotted time to return an explicitly requested block/transaction
+	reQueueBlockTimeout = 500 * time.Millisecond // Time allowance before blocks are requeued for import
 )
 
 const (
-	maxUncleDist = 7   // Maximum allowed backward distance from the chain head
+	maxUncleDist = 11  // Maximum allowed backward distance from the chain head
 	maxQueueDist = 32  // Maximum allowed distance from the chain head to queue
 	hashLimit    = 256 // Maximum number of unique blocks or headers a peer may have announced
 	blockLimit   = 64  // Maximum number of unique blocks a peer may have delivered
@@ -160,6 +162,8 @@ type BlockFetcher struct {
 	bodyFilter   chan chan *bodyFilterTask
 
 	quit chan struct{}
+
+	requeue chan *blockOrHeaderInject
 
 	// Announce states
 	announces  map[string]int                   // Per peer announce counts to prevent memory exhaustion
@@ -366,7 +370,7 @@ func (f *BlockFetcher) loop() {
 				f.forgetBlock(hash)
 				continue
 			}
-			f.importBlocks(op.origin, op.block)
+			f.importBlocks(op)
 		}
 		// Wait for an outside event to occur
 		select {
@@ -411,6 +415,21 @@ func (f *BlockFetcher) loop() {
 				f.rescheduleFetch(fetchTimer)
 			}
 
+		case op := <-f.requeue:
+			// Re-queue blocks that have not been written due to fork block competition
+			number := int64(0)
+			hash := ""
+			if op.header != nil {
+				number = op.header.Number.Int64()
+				hash = op.header.Hash().String()
+			} else if op.block != nil {
+				number = op.block.Number().Int64()
+				hash = op.block.Hash().String()
+			}
+
+			log.Info("Re-queue blocks", "number", number, "hash", hash)
+			f.enqueue(op.origin, op.header, op.block)
+
 		case op := <-f.inject:
 			// A direct block insertion was requested, try and fill any pending gaps
 			//blockBroadcastInMeter.Mark(1)
@@ -448,7 +467,7 @@ func (f *BlockFetcher) loop() {
 
 				// Create a closure of the fetch and schedule in on a new thread
 				fetchHeader, hashes := f.fetching[hashes[0]].fetchHeader, hashes
-				go func() {
+				gopool.Submit(func() {
 					defer debug.LogPanic()
 					if f.fetchingHook != nil {
 						f.fetchingHook(hashes)
@@ -457,7 +476,7 @@ func (f *BlockFetcher) loop() {
 						//headerFetchMeter.Mark(1)
 						fetchHeader(hash) // Suboptimal, but protocol doesn't allow batch header retrievals
 					}
-				}()
+				})
 			}
 			// Schedule the next fetch if blocks are still pending
 			f.rescheduleFetch(fetchTimer)
@@ -721,7 +740,9 @@ func (f *BlockFetcher) enqueue(peer string, header *types.Header, block *types.B
 // importBlocks spawns a new goroutine to run a block insertion into the chain. If the
 // block's number is at the same height as the current import phase, it updates
 // the phase states accordingly.
-func (f *BlockFetcher) importBlocks(peer string, block *types.Block) {
+func (f *BlockFetcher) importBlocks(op *blockOrHeaderInject) {
+	peer := op.origin
+	block := op.block
 	hash := block.Hash()
 
 	// Run the import on a new thread
@@ -735,6 +756,8 @@ func (f *BlockFetcher) importBlocks(peer string, block *types.Block) {
 	parent := f.getBlock(block.ParentHash())
 	if parent == nil {
 		log.Debug("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
+		time.Sleep(reQueueBlockTimeout)
+		f.requeue <- op
 		return
 	}
 	// Quickly validate the header and propagate the block if it passes
@@ -746,10 +769,12 @@ func (f *BlockFetcher) importBlocks(peer string, block *types.Block) {
 
 	case consensus.ErrFutureBlock:
 		// Weird future block, don't fail, but neither propagate
+		log.Error("Received future block", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		f.dropPeer(peer)
 
 	default:
 		// Something went very wrong, drop the peer
-		log.Debug("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		log.Error("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
 		f.dropPeer(peer)
 		return
 	}
