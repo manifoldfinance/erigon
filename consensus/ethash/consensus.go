@@ -611,12 +611,12 @@ func (ethash *Ethash) Finalize(config *params.ChainConfig, header *types.Header,
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and
 // uncle rewards, setting the final state and assembling the block.
 func (ethash *Ethash) FinalizeAndAssemble(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []types.Transaction, uncles []*types.Header, r types.Receipts,
-	e consensus.EpochReader, chain consensus.ChainHeaderReader, syscall consensus.SystemCall, call consensus.Call) (*types.Block, error) {
+	e consensus.EpochReader, chain consensus.ChainHeaderReader, syscall consensus.SystemCall, call consensus.Call) (*types.Block, []*types.Receipt, error) {
 
 	// Finalize block
 	ethash.Finalize(chainConfig, header, state, txs, uncles, r, nil, nil, e, chain, syscall)
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, r), nil
+	return types.NewBlock(header, txs, uncles, r), r, nil
 }
 
 func (ethash *Ethash) Delay(_ consensus.ChainReader, _ *types.Header) *time.Duration {
