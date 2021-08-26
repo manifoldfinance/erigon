@@ -52,6 +52,7 @@ var FullNodeGPO = gasprice.Config{
 	MaxBlockHistory:  0,
 	MaxPrice:         gasprice.DefaultMaxPrice,
 	IgnorePrice:      gasprice.DefaultIgnorePrice,
+	OracleThreshold:  1000,
 }
 
 // LightClientGPO contains default gasprice oracle settings for light client.
@@ -156,7 +157,7 @@ type Config struct {
 	Miner params.MiningConfig
 
 	// Ethash options
-	Ethash ethash.Config
+	Ethash ethash.Config `toml:",omitempty"`
 
 	Clique params.SnapshotConfig
 	Aura   params.AuRaConfig
