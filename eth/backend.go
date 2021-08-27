@@ -43,6 +43,7 @@ import (
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/consensus/clique"
 	"github.com/ledgerwatch/erigon/consensus/ethash"
+	// "github.com/ledgerwatch/erigon/consensus/parlia"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/rawdb"
 	"github.com/ledgerwatch/erigon/core/types"
@@ -57,6 +58,7 @@ import (
 	"github.com/ledgerwatch/erigon/ethdb/privateapi"
 	"github.com/ledgerwatch/erigon/ethdb/prune"
 	remotedbserver2 "github.com/ledgerwatch/erigon/ethdb/remotedbserver"
+	"github.com/ledgerwatch/erigon/internal/ethapi"
 	"github.com/ledgerwatch/erigon/node"
 	"github.com/ledgerwatch/erigon/p2p"
 	"github.com/ledgerwatch/erigon/params"
@@ -88,6 +90,8 @@ type Ethereum struct {
 	privateAPI *grpc.Server
 
 	engine consensus.Engine
+
+	APIBackend *EthAPIBackend
 
 	gasPrice  *uint256.Int
 	etherbase common.Address
@@ -204,6 +208,8 @@ func New(stack *node.Node, config *ethconfig.Config, logger log.Logger) (*Ethere
 
 	if chainConfig.Clique != nil {
 		consensusConfig = &config.Clique
+	// } else if chainConfig.Parlia != nil {
+	// 	consensusConfig = &config.Parlia
 	} else if chainConfig.Aura != nil {
 		config.Aura.Etherbase = config.Miner.Etherbase
 		consensusConfig = &config.Aura
@@ -211,7 +217,12 @@ func New(stack *node.Node, config *ethconfig.Config, logger log.Logger) (*Ethere
 		consensusConfig = &config.Ethash
 	}
 
-	backend.engine = ethconfig.CreateConsensusEngine(chainConfig, logger, consensusConfig, config.Miner.Notify, config.Miner.Noverify)
+	backend.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, nil}
+	if backend.APIBackend.allowUnprotectedTxs {
+		log.Info("Unprotected transactions allowed")
+	}
+	ethAPI := ethapi.NewPublicBlockChainAPI(backend.APIBackend)
+	backend.engine = ethconfig.CreateConsensusEngine(chainConfig, logger, consensusConfig, config.Miner.Notify, config.Miner.Noverify, ethAPI, backend.genesisHash)
 
 	log.Info("Initialising Ethereum protocol", "network", config.NetworkID)
 
@@ -547,6 +558,9 @@ func (s *Ethereum) shouldPreserve(block *types.Block) bool { //nolint
 	if _, ok := s.engine.(*clique.Clique); ok {
 		return false
 	}
+	// if _, ok := s.engine.(*parlia.Parlia); ok {
+	// 	return false
+	// }
 	return s.isLocalBlock(block)
 }
 

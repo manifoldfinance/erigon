@@ -154,6 +154,11 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 	}
 	return content
 }
+*/
+
+
+// todo bk: hacky, faux backend to get this working
+type Backend interface {}
 
 // PublicBlockChainAPI provides an API to access the Ethereum blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
@@ -166,6 +171,7 @@ func NewPublicBlockChainAPI(b Backend) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{b}
 }
 
+/*
 // ChainId returns the chainID value for transaction replay protection.
 func (s *PublicBlockChainAPI) ChainId() *hexutil.Big {
 	return (*hexutil.Big)(s.b.ChainConfig().ChainID)
