@@ -621,6 +621,8 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 			urls = params.CalaverasBootnodes
 		case params.SokolChainName:
 			urls = params.SokolBootnodes
+		case params.BSCMainnetChainName:
+			urls = params.BSCMainnetBootnodes
 		default:
 			if cfg.BootstrapNodes != nil {
 				return // already set, don't apply defaults.
@@ -663,6 +665,8 @@ func setBootstrapNodesV5(ctx *cli.Context, cfg *p2p.Config) {
 			urls = params.CalaverasBootnodes
 		case params.SokolChainName:
 			urls = params.SokolBootnodes
+		case params.BSCMainnetChainName:
+			urls = params.BSCMainnetBootnodes
 		default:
 			if cfg.BootstrapNodesV5 != nil {
 				return // already set, don't apply defaults.
@@ -1282,6 +1286,11 @@ func SetEthConfig(ctx *cli.Context, nodeConfig *node.Config, cfg *ethconfig.Conf
 			cfg.NetworkID = 77
 		}
 		cfg.Genesis = core.DefaultSokolGenesisBlock()
+	case params.BSCMainnetChainName:
+		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			cfg.NetworkID = 56
+		}
+		cfg.Genesis = core.DefaultBSCMainnetGenesisBlock()
 	case params.DevChainName:
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkID = 1337
@@ -1357,6 +1366,8 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 		genesis = core.DefaultCalaverasGenesisBlock()
 	case params.SokolChainName:
 		genesis = core.DefaultSokolGenesisBlock()
+	case params.BSCMainnetChainName:
+		genesis = core.DefaultBSCMainnetGenesisBlock()
 	case params.DevChainName:
 		Fatalf("Developer chains are ephemeral")
 	}

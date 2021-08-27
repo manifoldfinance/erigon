@@ -26,14 +26,15 @@ import (
 )
 
 const (
-	MainnetChainName   = "mainnet"
-	RopstenChainName   = "ropsten"
-	RinkebyChainName   = "rinkeby"
-	GoerliChainName    = "goerli"
-	DevChainName       = "dev"
-	ErigonMineName     = "erigonmine"
-	CalaverasChainName = "calaveras"
-	SokolChainName     = "sokol"
+	MainnetChainName    = "mainnet"
+	RopstenChainName    = "ropsten"
+	RinkebyChainName    = "rinkeby"
+	GoerliChainName     = "goerli"
+	DevChainName        = "dev"
+	ErigonMineName      = "erigonmine"
+	CalaverasChainName  = "calaveras"
+	SokolChainName      = "sokol"
+	BSCMainnetChainName = "bsc-mainnet"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -261,7 +262,8 @@ var (
 		Aura: &AuRaConfig{},
 	}
 
-	BSCChainConfig = &ChainConfig{
+	BSCMainnetChainConfig = &ChainConfig{
+		ChainName:           BSCMainnetChainName,
 		ChainID:             big.NewInt(56),
 		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
