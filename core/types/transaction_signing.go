@@ -159,6 +159,32 @@ func MustSignNewTx(prv *ecdsa.PrivateKey, s Signer, tx Transaction) Transaction 
 	return tx1
 }
 
+// Sender returns the address derived from the signature (V, R, S) using secp256k1
+// elliptic curve and an error if it failed deriving or upon an incorrect
+// signature.
+//
+// Sender may cache the address, allowing it to be used regardless of
+// signing method. The cache is invalidated if the cached signer does
+// not match the signer used in the current call.
+// func Sender(signer Signer, tx Transaction) (common.Address, error) {
+// 	if sc := tx.from.Load(); sc != nil {
+// 		sigCache := sc.(sigCache)
+// 		// If the signer used to derive from in a previous
+// 		// call is not the same as used current, invalidate
+// 		// the cache.
+// 		if sigCache.signer.Equal(signer) {
+// 			return sigCache.from, nil
+// 		}
+// 	}
+
+// 	addr, err := signer.Sender(tx)
+// 	if err != nil {
+// 		return common.Address{}, err
+// 	}
+// 	tx.from.Store(sigCache{signer: signer, from: addr})
+// 	return addr, nil
+// }
+
 // Signer encapsulates transaction signature handling. The name of this type is slightly
 // misleading because Signers don't actually sign, they're just for validating and
 // processing of signatures.
@@ -276,6 +302,22 @@ func (sg Signer) SignatureValues(tx Transaction, sig []byte) (R, S, V *uint256.I
 	return R, S, V, nil
 }
 
+// EIP155Signer implements Signer using the EIP-155 rules. This accepts transactions which
+// are replay-protected as well as unprotected homestead transactions.
+type EIP155Signer struct {
+	chainId, chainIdMul *big.Int
+}
+
+func NewEIP155Signer(chainId *big.Int) EIP155Signer {
+	if chainId == nil {
+		chainId = new(big.Int)
+	}
+	return EIP155Signer{
+		chainId:    chainId,
+		chainIdMul: new(big.Int).Mul(chainId, big.NewInt(2)),
+	}
+}
+
 func (sg Signer) ChainID() *uint256.Int {
 	return &sg.chainID
 }
@@ -338,4 +380,18 @@ func DeriveChainId(v *uint256.Int) *uint256.Int {
 	}
 	v = new(uint256.Int).Sub(v, u256.Num35)
 	return v.Div(v, u256.Num2)
+}
+
+// Hash returns the hash to be signed by the sender.
+// It does not uniquely identify the transaction.
+func (sg Signer) Hash(tx Transaction) common.Hash {
+	return rlpHash([]interface{}{
+		tx.GetNonce(),
+		tx.GetPrice(), // todo bk: this was tx.GasPrice need to make sure tx.GetPrice() is what we want
+		tx.GetGas(),
+		tx.GetTo(),
+		tx.GetValue(),
+		tx.GetData(),
+		tx.GetChainID(), uint(0), uint(0),
+	})
 }

@@ -1240,8 +1240,10 @@ func SetEthConfig(ctx *cli.Context, nodeConfig *node.Config, cfg *ethconfig.Conf
 		cfg.RangeLimit = ctx.GlobalBool(RangeLimitFlag.Name)
 	}
 
+
 	// Override any default configs for hard coded networks.
 	chain := ctx.GlobalString(ChainFlag.Name)
+	log.Info("Chain:", chain)
 	switch chain {
 	case "":
 		if cfg.NetworkID == 1 {

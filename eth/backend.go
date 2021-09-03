@@ -43,7 +43,7 @@ import (
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/consensus/clique"
 	"github.com/ledgerwatch/erigon/consensus/ethash"
-	// "github.com/ledgerwatch/erigon/consensus/parlia"
+	"github.com/ledgerwatch/erigon/consensus/parlia"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/rawdb"
 	"github.com/ledgerwatch/erigon/core/types"
@@ -208,8 +208,8 @@ func New(stack *node.Node, config *ethconfig.Config, logger log.Logger) (*Ethere
 
 	if chainConfig.Clique != nil {
 		consensusConfig = &config.Clique
-	// } else if chainConfig.Parlia != nil {
-	// 	consensusConfig = &config.Parlia
+	} else if chainConfig.Parlia != nil {
+		consensusConfig = &config.Parlia
 	} else if chainConfig.Aura != nil {
 		config.Aura.Etherbase = config.Miner.Etherbase
 		consensusConfig = &config.Aura
@@ -558,9 +558,9 @@ func (s *Ethereum) shouldPreserve(block *types.Block) bool { //nolint
 	if _, ok := s.engine.(*clique.Clique); ok {
 		return false
 	}
-	// if _, ok := s.engine.(*parlia.Parlia); ok {
-	// 	return false
-	// }
+	if _, ok := s.engine.(*parlia.Parlia); ok {
+		return false
+	}
 	return s.isLocalBlock(block)
 }
 

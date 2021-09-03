@@ -560,9 +560,19 @@ func (c *ChainConfig) IsEIP158(num uint64) bool {
 	return isForked(c.EIP158Block, num)
 }
 
+// IsEIP158 returns whether num is either equal to the EIP158 fork block or greater.
+func (c *ChainConfig) IsEIP158BigInt(num *big.Int) bool {
+	return configNumEqual(c.EIP158Block, num)
+}
+
 // IsByzantium returns whether num is either equal to the Byzantium fork block or greater.
 func (c *ChainConfig) IsByzantium(num uint64) bool {
 	return isForked(c.ByzantiumBlock, num)
+}
+
+// IsByzantium returns whether num is either equal to the Byzantium fork block or greater.
+func (c *ChainConfig) IsByzantiumBigInt(num *big.Int) bool {
+	return configNumEqual(c.ByzantiumBlock, num)
 }
 
 // IsConstantinople returns whether num is either equal to the Constantinople fork block or greater.
@@ -573,6 +583,11 @@ func (c *ChainConfig) IsConstantinople(num uint64) bool {
 // IsRamanujan returns whether num is either equal to the IsRamanujan fork block or greater.
 func (c *ChainConfig) IsRamanujan(num uint64) bool {
 	return isForked(c.RamanujanBlock, num)
+}
+
+// IsRamanujan returns whether num is either equal to the IsRamanujan fork block or greater.
+func (c *ChainConfig) IsRamanujanBigInt(num *big.Int) bool {
+	return configNumEqual(c.RamanujanBlock, num)
 }
 
 // IsOnRamanujan returns whether num is equal to the Ramanujan fork block

@@ -15,7 +15,7 @@ const (
 
 func (p *Parlia) delayForRamanujanFork(snap *Snapshot, header *types.Header) time.Duration {
 	delay := time.Until(time.Unix(int64(header.Time), 0)) // nolint: gosimple
-	if p.chainConfig.IsRamanujan(header.Number) {
+	if p.chainConfig.IsRamanujanBigInt(header.Number) {
 		return delay
 	}
 	if header.Difficulty.Cmp(diffNoTurn) == 0 {
@@ -28,14 +28,14 @@ func (p *Parlia) delayForRamanujanFork(snap *Snapshot, header *types.Header) tim
 
 func (p *Parlia) blockTimeForRamanujanFork(snap *Snapshot, header, parent *types.Header) uint64 {
 	blockTime := parent.Time + p.config.Period
-	if p.chainConfig.IsRamanujan(header.Number) {
+	if p.chainConfig.IsRamanujanBigInt(header.Number) {
 		blockTime = blockTime + backOffTime(snap, p.val)
 	}
 	return blockTime
 }
 
 func (p *Parlia) blockTimeVerifyForRamanujanFork(snap *Snapshot, header, parent *types.Header) error {
-	if p.chainConfig.IsRamanujan(header.Number) {
+	if p.chainConfig.IsRamanujanBigInt(header.Number) {
 		if header.Time < parent.Time+p.config.Period+backOffTime(snap, header.Coinbase) {
 			return consensus.ErrFutureBlock
 		}

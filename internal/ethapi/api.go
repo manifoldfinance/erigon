@@ -23,6 +23,7 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon/accounts/abi"
+	// "github.com/ledgerwatch/erigon/cmd/rpcdaemon/commands"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/common/math"
@@ -482,29 +483,31 @@ func (e *RevertError) ErrorData() interface{} {
 	return e.reason
 }
 
-/*
 // Call executes the given transaction on the state for the given block number.
 //
 // Additionally, the caller can specify a batch of contract for fields overriding.
 //
 // Note, this function doesn't make and changes in the state/blockchain and is
 // useful to execute and retrieve values.
-func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *map[common.Address]Account) (hexutil.Bytes, error) {
-	var accounts map[common.Address]Account
-	if overrides != nil {
-		accounts = *overrides
-	}
-	result, err := DoCall(ctx, s.b, args, blockNrOrHash, accounts, vm.Config{}, 5*time.Second, s.b.RPCGasCap())
-	if err != nil {
-		return nil, err
-	}
-	// If the result contains a revert reason, try to unpack and return it.
-	if len(result.Revert()) > 0 {
-		return nil, NewRevertError(result)
-	}
-	return result.Return(), result.Err
-}
+// func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *map[common.Address]Account) (hexutil.Bytes, error) {
+	// var accounts map[common.Address]Account
+	// if overrides != nil {
+	// 	accounts = *overrides
+	// }
+	// result, err := DoCall(ctx, s.b, args, blockNrOrHash, accounts, vm.Config{}, 5*time.Second, s.b.RPCGasCap())
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// // If the result contains a revert reason, try to unpack and return it.
+	// if len(result.Revert()) > 0 {
+	// 	return nil, NewRevertError(result)
+	// }
+	// return result.Return(), result.Err
 
+	// return eth_call.Call(ctx, args, blockNrOrHash, overrides)
+// }
+
+/*
 func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap uint64) (hexutil.Uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
