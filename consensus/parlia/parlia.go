@@ -452,35 +452,37 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 			break
 		}
 
-		// If an on-disk checkpoint snapshot can be found, use that
-		if number%checkpointInterval == 0 {
-			if s, err := loadSnapshot(p.config, p.signatures, p.db, hash, p.ethAPI); err == nil {
-				log.Trace("Loaded snapshot from disk", "number", number, "hash", hash)
-				snap = s
-				break
-			}
-		}
+		// todo bk: commented out, don't need for initial sync
+		// // If an on-disk checkpoint snapshot can be found, use that
+		// if number%checkpointInterval == 0 {
+		// 	if s, err := loadSnapshot(p.config, p.signatures, p.db, hash, p.ethAPI); err == nil {
+		// 		log.Trace("Loaded snapshot from disk", "number", number, "hash", hash)
+		// 		snap = s
+		// 		break
+		// 	}
+		// }
 
 		// If we're at the genesis, snapshot the initial state.
 		if number == 0 {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
-				// get checkpoint data
-				hash := checkpoint.Hash()
+				// todo bk: commented out, don't need for initial sync
+				// // get checkpoint data
+				// hash := checkpoint.Hash()
 
-				validatorBytes := checkpoint.Extra[extraVanity : len(checkpoint.Extra)-extraSeal]
-				// get validators from headers
-				validators, err := ParseValidators(validatorBytes)
-				if err != nil {
-					return nil, err
-				}
+				// validatorBytes := checkpoint.Extra[extraVanity : len(checkpoint.Extra)-extraSeal]
+				// // get validators from headers
+				// validators, err := ParseValidators(validatorBytes)
+				// if err != nil {
+				// 	return nil, err
+				// }
 
-				// new snap shot
-				snap = newSnapshot(p.config, p.signatures, number, hash, validators, p.ethAPI)
-				if err := snap.store(p.db); err != nil {
-					return nil, err
-				}
-				log.Info("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
+				// // new snap shot
+				// snap = newSnapshot(p.config, p.signatures, number, hash, validators, p.ethAPI)
+				// if err := snap.store(p.db); err != nil {
+				// 	return nil, err
+				// }
+				// log.Info("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
 				break
 			}
 		}
@@ -521,13 +523,14 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 	}
 	p.recentSnaps.Add(snap.Hash, snap)
 
-	// If we've generated a new checkpoint snapshot, save to disk
-	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
-		if err = snap.store(p.db); err != nil {
-			return nil, err
-		}
-		log.Trace("Stored snapshot to disk", "number", snap.Number, "hash", snap.Hash)
-	}
+	// todo bk: commented out, don't need for initial sync
+	// // If we've generated a new checkpoint snapshot, save to disk
+	// if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
+	// 	if err = snap.store(p.db); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	log.Trace("Stored snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+	// }
 	return snap, err
 }
 
@@ -989,7 +992,8 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, syscall consensus.S
 	msgData := (hexutil.Bytes)(data)
 	toAddress := common.HexToAddress(systemcontracts.ValidatorContract)
 	gas := (hexutil.Uint64)(uint64(math.MaxUint64 / 2))
-	result, err := p.ethAPI.Call(ctx, ethapi.CallArgs{
+	// result, err := p.ethAPI.Call(ctx, ethapi.CallArgs{
+	result, err := syscall(ctx, ethapi.CallArgs{
 		Gas:  &gas,
 		To:   &toAddress,
 		Data: &msgData,
