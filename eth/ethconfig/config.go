@@ -163,6 +163,7 @@ type Config struct {
 
 	Clique params.SnapshotConfig
 	Aura   params.AuRaConfig
+	Parlia   params.ParliaConfig
 
 	// Transaction pool options
 	TxPool core.TxPoolConfig
@@ -217,9 +218,19 @@ func CreateConsensusEngine(chainConfig *params.ChainConfig, logger log.Logger, c
 		if chainConfig.Clique != nil {
 			eng = clique.New(chainConfig, consensusCfg, db.OpenDatabase(consensusCfg.DBPath, logger, consensusCfg.InMemory))
 		}
+
+/*
+func New(
+	chainConfig *params.ChainConfig,
+	db ethdb.Database,
+	ethAPI *ethapi.PublicBlockChainAPI,
+	genesisHash common.Hash,
+)
+*/
+
 	case *params.ParliaConfig:
 		if chainConfig.Parlia != nil {
-			eng = parlia.New(chainConfig, db.OpenDatabase(consensusCfg.DBPath, consensusCfg.InMemory), ee, genesisHash)
+			eng = parlia.New(chainConfig, db.OpenDatabase(consensusCfg.DBPath, logger, consensusCfg.InMemory), ee, genesisHash)
 		}
 	case *params.AuRaConfig:
 		if chainConfig.Aura != nil {

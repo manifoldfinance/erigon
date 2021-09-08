@@ -2,7 +2,7 @@ package parlia
 
 import (
 	"bytes"
-	"context"
+	// "context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,6 +17,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/crypto/sha3"
+	"github.com/ledgerwatch/erigon-lib/kv"
 
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon"
@@ -25,7 +26,7 @@ import (
 	// "github.com/ledgerwatch/erigon/cmd/rpcdaemon"
 	"github.com/ledgerwatch/erigon/common"
 	// "github.com/ledgerwatch/erigon/common/gopool"
-	"github.com/ledgerwatch/erigon/common/hexutil"
+	// "github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/common/u256"
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/consensus/misc"
@@ -36,7 +37,7 @@ import (
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
 	"github.com/ledgerwatch/erigon/crypto"
-	"github.com/ledgerwatch/erigon/ethdb"
+	// "github.com/ledgerwatch/erigon/ethdb"
 	"github.com/ledgerwatch/erigon/internal/ethapi"
 	"github.com/ledgerwatch/erigon/params"
 	"github.com/ledgerwatch/erigon/rlp"
@@ -198,7 +199,7 @@ type Parlia struct {
 	chainConfig *params.ChainConfig  // Chain config
 	config      *params.ParliaConfig // Consensus engine configuration parameters for parlia consensus
 	genesisHash common.Hash
-	db          ethdb.Database // Database to store and retrieve snapshot checkpoints
+	db          kv.RwDB // Database to store and retrieve snapshot checkpoints
 
 	recentSnaps *lru.ARCCache // Snapshots for recent block to speed up
 	signatures  *lru.ARCCache // Signatures of recent blocks to speed up mining
@@ -224,7 +225,7 @@ type Parlia struct {
 // New creates a Parlia consensus engine.
 func New(
 	chainConfig *params.ChainConfig,
-	db ethdb.Database,
+	db kv.RwDB,
 	ethAPI *ethapi.PublicBlockChainAPI,
 	genesisHash common.Hash,
 ) *Parlia {
@@ -975,13 +976,13 @@ func (p *Parlia) Close() error {
 // getCurrentValidators get current validators
 func (p *Parlia) getCurrentValidators(blockHash common.Hash, syscall consensus.SystemCall) ([]common.Address, error) {
 	// block
-	blockNr := rpc.BlockNumberOrHashWithHash(blockHash, false)
+	// blockNr := rpc.BlockNumberOrHashWithHash(blockHash, false)
 
 	// method
 	method := "getValidators"
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel() // cancel when we are finished consuming integers
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel() // cancel when we are finished consuming integers
 
 	data, err := p.validatorSetABI.Pack(method)
 	if err != nil {
@@ -989,15 +990,17 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, syscall consensus.S
 		return nil, err
 	}
 	// call
-	msgData := (hexutil.Bytes)(data)
+	// msgData := (hexutil.Bytes)(data)
 	toAddress := common.HexToAddress(systemcontracts.ValidatorContract)
-	gas := (hexutil.Uint64)(uint64(math.MaxUint64 / 2))
+	// gas := (hexutil.Uint64)(uint64(math.MaxUint64 / 2))
 	// result, err := p.ethAPI.Call(ctx, ethapi.CallArgs{
-	result, err := syscall(ctx, ethapi.CallArgs{
-		Gas:  &gas,
-		To:   &toAddress,
-		Data: &msgData,
-	}, blockNr, nil)
+	// 	Gas:  &gas,
+	// 	To:   &toAddress,
+	// 	Data: &msgData,
+	// }, blockNr, nil)
+
+	result, err := syscall(toAddress, data)
+
 	if err != nil {
 		return nil, err
 	}
@@ -1175,7 +1178,7 @@ func (p *Parlia) applyTransaction(
 				hex.EncodeToString(expectedTx.Data),
 			)
 		}
-		expectedTx, ok := (*actualTx).(types.Transaction) // todo bk: I don't like this
+		// expectedTx, ok := (*actualTx).(types.Transaction) // todo bk: I don't like this
 		// move to next
 		*receivedTxs = (*receivedTxs)[1:]
 	}
@@ -1185,7 +1188,7 @@ func (p *Parlia) applyTransaction(
 		return err
 	}
 	txs = append(txs, expectedTx)
-	var root []byte
+	// var root []byte
 	if p.chainConfig.IsByzantiumBigInt(header.Number) {
 		// state.Finalise(true)
 	} else {
