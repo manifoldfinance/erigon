@@ -299,7 +299,8 @@ func (p *Parlia) Author(header *types.Header) (common.Address, error) {
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
 func (p *Parlia) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
-	return p.verifyHeader(chain, header, nil)
+	// return p.verifyHeader(chain, header, nil)
+	return nil
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
