@@ -374,6 +374,44 @@ func ReadBodyWithTransactions(db kv.Getter, hash common.Hash, number uint64) *ty
 	return body
 }
 
+func RawTransactionsRange(db kv.Getter, from, to uint64) (res [][]byte, err error) {
+	blockKey := make([]byte, dbutils.NumberLength+common.HashLength)
+	encNum := make([]byte, 8)
+	for i := from; i < to+1; i++ {
+		binary.BigEndian.PutUint64(encNum, i)
+		hash, err := db.GetOne(kv.HeaderCanonical, encNum)
+		if err != nil {
+			return nil, err
+		}
+		if len(hash) == 0 {
+			continue
+		}
+
+		binary.BigEndian.PutUint64(blockKey, i)
+		copy(blockKey[dbutils.NumberLength:], hash)
+		bodyRlp, err := db.GetOne(kv.BlockBody, blockKey)
+		if err != nil {
+			return nil, err
+		}
+		if len(bodyRlp) == 0 {
+			continue
+		}
+		baseTxId, txAmount, err := types.DecodeOnlyTxMetadataFromBody(bodyRlp)
+		if err != nil {
+			return nil, err
+		}
+
+		binary.BigEndian.PutUint64(encNum, baseTxId)
+		if err = db.ForAmount(kv.EthTx, encNum, txAmount, func(k, v []byte) error {
+			res = append(res, v)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return
+}
+
 func ReadBody(db kv.Getter, hash common.Hash, number uint64) (*types.Body, uint64, uint32) {
 	data := ReadStorageBodyRLP(db, hash, number)
 	if len(data) == 0 {
@@ -511,7 +549,7 @@ func DeleteTd(db kv.Deleter, hash common.Hash, number uint64) error {
 // HasReceipts verifies the existence of all the transaction receipts belonging
 // to a block.
 func HasReceipts(db kv.Has, hash common.Hash, number uint64) bool {
-	if has, err := db.Has(kv.Receipts, dbutils.ReceiptsKey(number)); !has || err != nil {
+	if has, err := db.Has(kv.Receipts, dbutils.EncodeBlockNumber(number)); !has || err != nil {
 		return false
 	}
 	return true
@@ -522,7 +560,7 @@ func HasReceipts(db kv.Has, hash common.Hash, number uint64) bool {
 // should not be used. Use ReadReceipts instead if the metadata is needed.
 func ReadRawReceipts(db kv.Tx, blockNum uint64) types.Receipts {
 	// Retrieve the flattened receipt slice
-	data, err := db.GetOne(kv.Receipts, dbutils.ReceiptsKey(blockNum))
+	data, err := db.GetOne(kv.Receipts, dbutils.EncodeBlockNumber(blockNum))
 	if err != nil {
 		log.Error("ReadRawReceipts failed", "err", err)
 	}
@@ -617,7 +655,7 @@ func WriteReceipts(tx kv.Putter, number uint64, receipts types.Receipts) error {
 		return fmt.Errorf("encode block receipts for block %d: %v", number, err)
 	}
 
-	if err = tx.Put(kv.Receipts, dbutils.ReceiptsKey(number), buf.Bytes()); err != nil {
+	if err = tx.Put(kv.Receipts, dbutils.EncodeBlockNumber(number), buf.Bytes()); err != nil {
 		return fmt.Errorf("writing receipts for block %d: %v", number, err)
 	}
 	return nil
@@ -649,7 +687,7 @@ func AppendReceipts(tx kv.RwTx, blockNumber uint64, receipts types.Receipts) err
 		return fmt.Errorf("encode block receipts for block %d: %v", blockNumber, err)
 	}
 
-	if err = tx.Append(kv.Receipts, dbutils.ReceiptsKey(blockNumber), buf.Bytes()); err != nil {
+	if err = tx.Append(kv.Receipts, dbutils.EncodeBlockNumber(blockNumber), buf.Bytes()); err != nil {
 		return fmt.Errorf("writing receipts for block %d: %v", blockNumber, err)
 	}
 	return nil
@@ -657,7 +695,7 @@ func AppendReceipts(tx kv.RwTx, blockNumber uint64, receipts types.Receipts) err
 
 // DeleteReceipts removes all receipt data associated with a block hash.
 func DeleteReceipts(db kv.RwTx, number uint64) error {
-	if err := db.Delete(kv.Receipts, dbutils.ReceiptsKey(number), nil); err != nil {
+	if err := db.Delete(kv.Receipts, dbutils.EncodeBlockNumber(number), nil); err != nil {
 		return fmt.Errorf("receipts delete failed: %d, %w", number, err)
 	}
 
@@ -673,7 +711,7 @@ func DeleteReceipts(db kv.RwTx, number uint64) error {
 
 // DeleteNewerReceipts removes all receipt for given block number or newer
 func DeleteNewerReceipts(db kv.RwTx, number uint64) error {
-	if err := db.ForEach(kv.Receipts, dbutils.ReceiptsKey(number), func(k, v []byte) error {
+	if err := db.ForEach(kv.Receipts, dbutils.EncodeBlockNumber(number), func(k, v []byte) error {
 		return db.Delete(kv.Receipts, k, nil)
 	}); err != nil {
 		return err

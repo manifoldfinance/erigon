@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/holiman/uint256"
+	libcommon "github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/hexutil"
@@ -195,10 +196,10 @@ func (args *TraceCallParam) ToMessage(globalGasCap uint64, baseFee *uint256.Int)
 			gasPrice = new(uint256.Int)
 			if gasFeeCap.BitLen() > 0 || gasTipCap.BitLen() > 0 {
 				gasPrice = math2.U256Min(new(uint256.Int).Add(gasTipCap, baseFee), gasFeeCap)
-			}
-			// Still zero
-			if gasPrice.IsZero() {
+			} else {
+				// This means gasFeeCap == 0, gasTipCap == 0
 				gasPrice.Set(baseFee)
+				gasFeeCap, gasTipCap = gasPrice, gasPrice
 			}
 		}
 	}
@@ -269,7 +270,7 @@ func (ot *OeTracer) CaptureStart(depth int, from common.Address, to common.Addre
 			vmTrace.Code = code
 		}
 	}
-	if precompile {
+	if precompile && depth > 0 {
 		ot.precompile = true
 		return nil
 	}
@@ -420,7 +421,7 @@ func (ot *OeTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		} else {
 			vmTrace = ot.r.VmTrace
 		}
-		if ot.lastVmOp != nil {
+		if ot.lastVmOp != nil && ot.lastVmOp.Ex != nil {
 			// Set the "push" of the last operation
 			var showStack int
 			switch {
@@ -1095,7 +1096,7 @@ func (api *TraceAPIImpl) doCallMany(ctx context.Context, dbtx kv.Tx, msgs []type
 		useParent = true
 	}
 	for txIndex, msg := range msgs {
-		if err := common.Stopped(ctx.Done()); err != nil {
+		if err := libcommon.Stopped(ctx.Done()); err != nil {
 			return nil, err
 		}
 		traceResult := &TraceCallResult{Trace: []*ParityTrace{}}

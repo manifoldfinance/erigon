@@ -178,28 +178,6 @@ var (
 		Ethash:              new(EthashConfig),
 	}
 
-	CalaverasChainConfig = &ChainConfig{
-		ChainName:           CalaverasChainName,
-		ChainID:             big.NewInt(123),
-		HomesteadBlock:      big.NewInt(0),
-		DAOForkBlock:        nil,
-		DAOForkSupport:      true,
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    nil,
-		BerlinBlock:         big.NewInt(0),
-		LondonBlock:         big.NewInt(500),
-		Clique: &CliqueConfig{
-			Period: 30,
-			Epoch:  30000,
-		},
-	}
-
 	SokolChainConfig = &ChainConfig{
 		ChainName:      SokolChainName,
 		ChainID:        big.NewInt(77),
@@ -665,7 +643,7 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *Confi
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
 // to guarantee that forks can be implemented in a different order than on official networks
 func (c *ChainConfig) CheckConfigForkOrder() error {
-	if c.ChainID.Uint64() == 77 {
+	if c != nil && c.ChainID != nil && c.ChainID.Uint64() == 77 {
 		return nil
 	}
 	type fork struct {

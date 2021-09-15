@@ -8,11 +8,11 @@ import (
 	"os"
 	"sort"
 
+	"github.com/ledgerwatch/erigon-lib/etl"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/changeset"
 	"github.com/ledgerwatch/erigon/common/dbutils"
-	"github.com/ledgerwatch/erigon/common/etl"
 	"github.com/ledgerwatch/erigon/core/rawdb"
 	"github.com/ledgerwatch/erigon/core/types/accounts"
 	"github.com/ledgerwatch/erigon/eth/stagedsync/stages"
@@ -91,8 +91,9 @@ func SpawnIntermediateHashesStage(s *StageState, u Unwinder, tx kv.RwTx, cfg Tri
 		if cfg.checkRoot && root != expectedRootHash {
 			log.Error(fmt.Sprintf("[%s] Wrong trie root of block %d: %x, expected (from header): %x. Block hash: %x", logPrefix, to, root, expectedRootHash, headerHash))
 			if to > s.BlockNumber {
-				log.Warn("Unwinding due to incorrect root hash", "to", to-1)
-				u.UnwindTo(to-1, headerHash)
+				unwindTo := (to + s.BlockNumber) / 2 // Binary search for the correct block, biased to the lower numbers
+				log.Warn("Unwinding due to incorrect root hash", "to", unwindTo)
+				u.UnwindTo(unwindTo, headerHash)
 			}
 		} else if err = s.Update(tx, to); err != nil {
 			return trie.EmptyRoot, err
@@ -398,12 +399,6 @@ func UnwindIntermediateHashesStage(u *UnwindState, s *StageState, tx kv.RwTx, cf
 	syncHeadHeader := rawdb.ReadHeader(tx, hash, u.UnwindPoint)
 	expectedRootHash := syncHeadHeader.Root
 	//fmt.Printf("\n\nu: %d->%d\n", s.BlockNumber, u.UnwindPoint)
-
-	// if cache != nil {
-	// 	if err = cacheWarmUpIfNeed(tx, cache); err != nil {
-	// 		return err
-	// 	}
-	// }
 
 	logPrefix := s.LogPrefix()
 	if err := unwindIntermediateHashesStageImpl(logPrefix, u, s, tx, cfg, expectedRootHash, quit); err != nil {

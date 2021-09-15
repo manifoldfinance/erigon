@@ -128,7 +128,7 @@ func newMemoryDB(logger log.Logger) (*DB, error) {
 func newPersistentDB(logger log.Logger, path string) (*DB, error) {
 	var db kv.RwDB
 	var err error
-	db, err = mdbx.NewMDBX(logger).Path(path).Label(kv.SentryDB).MapSize(64 * datasize.MB).WithTablessCfg(bucketsConfig).Open()
+	db, err = mdbx.NewMDBX(logger).Path(path).Label(kv.SentryDB).MapSize(256 * datasize.MB).WithTablessCfg(bucketsConfig).Open()
 	if err != nil {
 		return nil, err
 	}
@@ -771,11 +771,15 @@ func (db *DB) commitCache(logit bool) {
 
 // close flushes and closes the database files.
 func (db *DB) Close() {
+	select {
+	case <-db.quit:
+		return // means closed already
+	default:
+	}
 	if db.quit == nil {
 		return
 	}
 	close(db.quit)
-	db.quit = nil
 	db.kvCacheLock.Lock()
 	defer db.kvCacheLock.Unlock()
 	db.commitCache(true /* logit */)

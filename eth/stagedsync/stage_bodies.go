@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/c2h5oh/datasize"
+	libcommon "github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/core/rawdb"
@@ -94,6 +95,8 @@ func BodiesForward(
 	var req *bodydownload.BodyRequest
 	var peer []byte
 	stopped := false
+	prevProgress := bodyProgress
+	noProgressCount := 0 // How many time the progress was printed without actual progress
 Loop:
 	for !stopped {
 		// TODO: this is incorrect use
@@ -174,6 +177,9 @@ Loop:
 			stopped = true
 			break
 		}
+		if s.BlockNumber > 0 && noProgressCount >= 5 {
+			break
+		}
 		timer.Stop()
 		timer = time.NewTimer(1 * time.Second)
 		select {
@@ -181,7 +187,13 @@ Loop:
 			stopped = true
 		case <-logEvery.C:
 			deliveredCount, wastedCount := cfg.bd.DeliveryCounts()
+			if prevProgress == bodyProgress {
+				noProgressCount++
+			} else {
+				noProgressCount = 0 // Reset, there was progress
+			}
 			logProgressBodies(logPrefix, bodyProgress, prevDeliveredCount, deliveredCount, prevWastedCount, wastedCount)
+			prevProgress = bodyProgress
 			prevDeliveredCount = deliveredCount
 			prevWastedCount = wastedCount
 			//log.Info("Timings", "d1", d1, "d2", d2, "d3", d3, "d4", d4, "d5", d5, "d6", d6)
@@ -201,7 +213,7 @@ Loop:
 		}
 	}
 	if stopped {
-		return common.ErrStopped
+		return libcommon.ErrStopped
 	}
 	if bodyProgress > s.BlockNumber+16 {
 		log.Info(fmt.Sprintf("[%s] Processed", logPrefix), "highest", bodyProgress)

@@ -17,8 +17,10 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/ledgerwatch/erigon/params"
 	"net"
 	"net/http"
 	"os"
@@ -273,7 +275,7 @@ func (n *Node) openDataDir() error {
 		return nil // ephemeral
 	}
 
-	instdir := n.config.instanceDir()
+	instdir := n.config.DataDir
 	if err := os.MkdirAll(instdir, 0700); err != nil {
 		return err
 	}
@@ -475,7 +477,7 @@ func (n *Node) DataDir() string {
 
 // InstanceDir retrieves the instance directory used by the protocol stack.
 func (n *Node) InstanceDir() string {
-	return n.config.instanceDir()
+	return n.config.DataDir
 }
 
 // HTTPEndpoint returns the URL of the HTTP server. Note that this URL does not
@@ -507,7 +509,13 @@ func OpenDatabase(config *Config, logger log.Logger, label kv.Label) (kv.RwDB, e
 		db = memdb.New()
 		return db, nil
 	}
-	dbPath := config.ResolvePath(name)
+
+	oldDbPath := filepath.Join(config.DataDir, "erigon", name)
+	dbPath := filepath.Join(config.DataDir, name)
+	if _, err := os.Stat(oldDbPath); err == nil {
+		log.Error("Old directory location found", "path", oldDbPath, "please move to new path", dbPath)
+		return nil, fmt.Errorf("safety error, see log message")
+	}
 
 	var openFunc func(exclusive bool) (kv.RwDB, error)
 	log.Info("Opening Database", "label", name, "path", dbPath)
@@ -543,6 +551,12 @@ func OpenDatabase(config *Config, logger log.Logger, label kv.Label) (kv.RwDB, e
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if err := db.Update(context.Background(), func(tx kv.RwTx) (err error) {
+		return params.SetErigonVersion(tx, params.VersionKeyCreated)
+	}); err != nil {
+		return nil, err
 	}
 
 	return db, nil
