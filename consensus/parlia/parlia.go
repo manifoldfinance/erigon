@@ -299,8 +299,7 @@ func (p *Parlia) Author(header *types.Header) (common.Address, error) {
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
 func (p *Parlia) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
-	// return p.verifyHeader(chain, header, nil)
-	return nil
+	return p.verifyHeader(chain, header, nil)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
@@ -404,15 +403,16 @@ func (p *Parlia) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 		return consensus.ErrUnknownAncestor
 	}
 
-	snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
-	if err != nil {
-		return err
-	}
+	// todo bk: this breaks the sync, this will still be needed though to verify the headers
+	// snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
+	// if err != nil {
+	// 	return err
+	// }
 
-	err = p.blockTimeVerifyForRamanujanFork(snap, header, parent)
-	if err != nil {
-		return err
-	}
+	// err = p.blockTimeVerifyForRamanujanFork(snap, header, parent)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Verify that the gas limit is <= 2^63-1
 	capacity := uint64(0x7fffffffffffffff)
@@ -561,13 +561,15 @@ func (p *Parlia) verifySeal(chain consensus.ChainHeaderReader, header *types.Hea
 	if number == 0 {
 		return errUnknownBlock
 	}
-	// Retrieve the snapshot needed to verify this header and cache it
-	snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
-	if err != nil {
-		return err
-	}
 
-	// Resolve the authorization key and check against validators
+	// todo bk: this breaks the sync, this will still be needed though to verify the headers
+	// // Retrieve the snapshot needed to verify this header and cache it
+	// snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// // Resolve the authorization key and check against validators
 	signer, err := ecrecover(header, p.signatures, p.chainConfig.ChainID)
 	if err != nil {
 		return err
@@ -577,29 +579,30 @@ func (p *Parlia) verifySeal(chain consensus.ChainHeaderReader, header *types.Hea
 		return errCoinBaseMisMatch
 	}
 
-	if _, ok := snap.Validators[signer]; !ok {
-		return errUnauthorizedValidator
-	}
+	// todo bk: this breaks the sync, this will still be needed though to verify the headers
+	// if _, ok := snap.Validators[signer]; !ok {
+	// 	return errUnauthorizedValidator
+	// }
 
-	for seen, recent := range snap.Recents {
-		if recent == signer {
-			// Signer is among recents, only fail if the current block doesn't shift it out
-			if limit := uint64(len(snap.Validators)/2 + 1); seen > number-limit {
-				return errRecentlySigned
-			}
-		}
-	}
+	// for seen, recent := range snap.Recents {
+	// 	if recent == signer {
+	// 		// Signer is among recents, only fail if the current block doesn't shift it out
+	// 		if limit := uint64(len(snap.Validators)/2 + 1); seen > number-limit {
+	// 			return errRecentlySigned
+	// 		}
+	// 	}
+	// }
 
-	// Ensure that the difficulty corresponds to the turn-ness of the signer
-	if !p.fakeDiff {
-		inturn := snap.inturn(signer)
-		if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
-			return errWrongDifficulty
-		}
-		if !inturn && header.Difficulty.Cmp(diffNoTurn) != 0 {
-			return errWrongDifficulty
-		}
-	}
+	// // Ensure that the difficulty corresponds to the turn-ness of the signer
+	// if !p.fakeDiff {
+	// 	inturn := snap.inturn(signer)
+	// 	if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
+	// 		return errWrongDifficulty
+	// 	}
+	// 	if !inturn && header.Difficulty.Cmp(diffNoTurn) != 0 {
+	// 		return errWrongDifficulty
+	// 	}
+	// }
 
 	return nil
 }
