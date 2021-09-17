@@ -878,6 +878,9 @@ func byChain() (*core.Genesis, *params.ChainConfig) {
 	case params.SokolChainName:
 		chainConfig = params.SokolChainConfig
 		genesis = core.DefaultSokolGenesisBlock()
+	case params.BSCMainnetChainName:
+		chainConfig = params.BSCMainnetChainConfig
+		genesis = core.DefaultBSCMainnetGenesisBlock()
 	}
 	return genesis, chainConfig
 }
