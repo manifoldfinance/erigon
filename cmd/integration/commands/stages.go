@@ -916,6 +916,16 @@ func newSync(ctx context.Context, db kv.RwDB, miningConfig *params.MiningConfig)
 	// 	engine = ethconfig.CreateConsensusEngine(chainConfig, logger, &params.AuRaConfig{DBPath: path.Join(datadir, "aura")}, nil, false)
 	// }
 
+	switch chain {
+	case params.BSCMainnetChainName:
+		config := &ethconfig.Defaults
+		var consensusConfig interface{}
+		if chainConfig.Parlia != nil {
+			consensusConfig = &params.ParliaConfig{DBPath: path.Join(datadir, "parlia")}
+		}
+		engine = ethconfig.CreateConsensusEngine(chainConfig, logger, consensusConfig, config.Miner.Notify, config.Miner.Noverify, nil, common.Hash{})
+	}
+
 	events := privateapi.NewEvents()
 
 	txPool := core.NewTxPool(ethconfig.Defaults.TxPool, chainConfig, db)

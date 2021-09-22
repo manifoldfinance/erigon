@@ -270,16 +270,16 @@ func New(
 	return c
 }
 
-func (p *Parlia) IsSystemTransaction(tx types.Transaction, header *types.Header) (bool, error) {
+func (p *Parlia) IsSystemTransaction(tx *types.Transaction, header *types.Header) (bool, error) {
 	// deploy a contract
-	if tx.GetTo() == nil {
+	if (*tx).GetTo() == nil {
 		return false, nil
 	}
-	sender, err := tx.Sender(p.signer)
+	sender, err := (*tx).Sender(p.signer)
 	if err != nil {
 		return false, errors.New("UnAuthorized transaction")
 	}
-	if sender == header.Coinbase && isToSystemContract(*tx.GetTo()) && tx.GetPrice().Cmp(uint256.NewInt(0)) == 0 {
+	if sender == header.Coinbase && isToSystemContract(*(*tx).GetTo()) && (*tx).GetPrice().Cmp(uint256.NewInt(0)) == 0 {
 		return true, nil
 	}
 	return false, nil
