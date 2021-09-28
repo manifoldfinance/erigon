@@ -108,7 +108,7 @@ func loadSnapshot(config *params.ParliaConfig, sigCache *lru.ARCCache, db kv.RwD
 	}
 	defer tx.Rollback()
 	// todo bk: should not be hardcoded, should be added to erigon-lib/kv/tables.go
-	blob, err := tx.GetOne(kv.ParliaSnapshot, SnapshotFullKey(num, hash))
+	blob, err := tx.GetOne(kv.CliqueSnapshot, SnapshotFullKey(num, hash))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (s *Snapshot) store(db kv.RwDB) error {
 
 	// todo bk: should not be hardcoded, should be added to erigon-lib/kv/tables.go
 	return db.Update(context.Background(), func(tx kv.RwTx) error {
-		return tx.Put(kv.ParliaSnapshot, SnapshotFullKey(s.Number, s.Hash), blob)
+		return tx.Put(kv.CliqueSnapshot, SnapshotFullKey(s.Number, s.Hash), blob)
 	})
 }
 
