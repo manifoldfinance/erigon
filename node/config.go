@@ -165,6 +165,7 @@ type Config struct {
 	// RangeLimit enable 5000 blocks limit when handle range query
 	RangeLimit bool `toml:",omitempty"`
 
+	MdbxAugumentLimit uint64
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

@@ -34,6 +34,7 @@ const (
 	ErigonMineName      = "erigonmine"
 	CalaverasChainName  = "calaveras"
 	SokolChainName      = "sokol"
+	KovanChainName      = "kovan"
 	BSCMainnetChainName = "bsc-mainnet"
 )
 
@@ -46,6 +47,7 @@ var (
 	ErigonGenesisHash    = common.HexToHash("0xfecd5c85712e36f30f09ba3a42386b42c46b5ba5395a4246b952e655f9aa0f58")
 	CalaverasGenesisHash = common.HexToHash("0xeb9233d066c275efcdfed8037f4fc082770176aefdbcb7691c71da412a5670f2")
 	SokolGenesisHash     = common.HexToHash("0x5b28c1bfd3a15230c9a46b399cd0f9a6920d432e85381cc6a140b06e8410112f")
+	KovanGenesisHash   = common.HexToHash("0xa3c565fc15c7478862d50ccd6561e3c06b24cc509bf388941c25ea985ce32cb9")
 	BSCGenesisHash       = common.HexToHash("0x0d21840abff46b96c84b2ac9e10e4f5cdaeb5693cb665db62a2f3b02d2d57b5b")
 	ChapelGenesisHash    = common.HexToHash("0x6d3c66c5357ec91d5c43af47e234a939b22557cbb552dc45bebbceeed90fbe34")
 	RialtoGenesisHash    = common.HexToHash("0x005dc005bddd1967de6187c1c23be801eb7abdd80cebcc24f341b727b70311d6")
@@ -58,6 +60,7 @@ var (
 
 var (
 	SokolGenesisStateRoot = common.HexToHash("0xfad4af258fd11939fae0c6c6eec9d340b1caac0b0196fd9a1bc3f489c5bf00b3")
+	KovanGenesisStateRoot = common.HexToHash("0x2480155b48a1cea17d67dbfdfaafe821c1d19cdd478c5358e8ec56dec24502b2")
 )
 
 var (
@@ -237,7 +240,28 @@ var (
 		MuirGlacierBlock:    nil,
 		BerlinBlock:         big.NewInt(21050600),
 		//LondonBlock:         big.NewInt(21050600),
-		Aura: &AuRaConfig{},
+		CatalystBlock: nil,
+		Aura:          &AuRaConfig{},
+	}
+
+	KovanChainConfig = &ChainConfig{
+		ChainName:           KovanChainName,
+		ChainID:             big.NewInt(42),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(5067000),
+		ConstantinopleBlock: big.NewInt(9200000),
+		PetersburgBlock:     big.NewInt(10255201),
+		IstanbulBlock:       big.NewInt(14111141),
+		MuirGlacierBlock:    nil,
+		BerlinBlock:         big.NewInt(24770900),
+		LondonBlock:         big.NewInt(26741100),
+		CatalystBlock:       nil,
+		Aura:                &AuRaConfig{},
 	}
 
 	BSCMainnetChainConfig = &ChainConfig{
@@ -322,6 +346,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         nil,
+		CatalystBlock:       nil,
 		Ethash:              new(EthashConfig),
 		Clique:              nil,
 	}
@@ -347,6 +372,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         nil,
+		CatalystBlock:       nil,
 		Ethash:              nil,
 		Clique:              &CliqueConfig{Period: 0, Epoch: 30000},
 	}
@@ -369,6 +395,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         nil,
+		CatalystBlock:       nil,
 		Ethash:              new(EthashConfig),
 		Clique:              nil,
 	}
@@ -405,6 +432,7 @@ type ChainConfig struct {
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	BerlinBlock         *big.Int `json:"berlinBlock,omitempty"`         // Berlin switch block (nil = no fork, 0 = already on berlin)
 	LondonBlock         *big.Int `json:"londonBlock,omitempty"`         // London switch block (nil = no fork, 0 = already on london)
+	CatalystBlock       *big.Int `json:"catalystBlock,omitempty"`       // Catalyst switch block (nil = no fork, 0 = already on catalyst)
 
 	RamanujanBlock  *big.Int `json:"ramanujanBlock,omitempty" toml:",omitempty"`  // ramanujanBlock switch block (nil = no fork, 0 = already activated)
 	NielsBlock      *big.Int `json:"nielsBlock,omitempty" toml:",omitempty"`      // nielsBlock switch block (nil = no fork, 0 = already activated)
@@ -622,6 +650,11 @@ func (c *ChainConfig) IsLondon(num uint64) bool {
 	return isForked(c.LondonBlock, num)
 }
 
+// IsCatalyst returns whether num is either equal to the Merge fork block or greater.
+func (c *ChainConfig) IsCatalyst(num uint64) bool {
+	return isForked(c.CatalystBlock, num)
+}
+
 // CheckCompatible checks whether scheduled fork transitions have been imported
 // with a mismatching chain configuration.
 func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *ConfigCompatError {
@@ -809,7 +842,7 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsBerlin, IsLondon                                      bool
+	IsBerlin, IsLondon, IsCatalyst                          bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -830,5 +863,6 @@ func (c *ChainConfig) Rules(num uint64) Rules {
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
 		IsLondon:         c.IsLondon(num),
+		IsCatalyst:       c.IsCatalyst(num),
 	}
 }
