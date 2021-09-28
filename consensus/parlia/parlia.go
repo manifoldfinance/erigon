@@ -306,7 +306,7 @@ func (p *Parlia) VerifyHeader(chain consensus.ChainHeaderReader, header *types.H
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
 func (p *Parlia) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) error {
-	// bk: this gets called in blockchain.go in BSC but in Erigon, this is not needed, so commenting out
+	// todo bk: this gets called in blockchain.go in BSC but in Erigon, this is not needed, so commenting out
 	// abort := make(chan struct{})
 	// results := make(chan error, len(headers))
 
@@ -404,15 +404,15 @@ func (p *Parlia) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	}
 
 	// todo bk: this breaks the sync, this will still be needed though to verify the headers
-	// snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
-	// if err != nil {
-	// 	return err
-	// }
+	snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
+	if err != nil {
+		return err
+	}
 
-	// err = p.blockTimeVerifyForRamanujanFork(snap, header, parent)
-	// if err != nil {
-	// 	return err
-	// }
+	err = p.blockTimeVerifyForRamanujanFork(snap, header, parent)
+	if err != nil {
+		return err
+	}
 
 	// Verify that the gas limit is <= 2^63-1
 	capacity := uint64(0x7fffffffffffffff)
@@ -455,36 +455,36 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		}
 
 		// todo bk: commented out, don't need for initial sync
-		// // If an on-disk checkpoint snapshot can be found, use that
-		// if number%checkpointInterval == 0 {
-		// 	if s, err := loadSnapshot(p.config, p.signatures, p.db, hash, p.ethAPI); err == nil {
-		// 		log.Trace("Loaded snapshot from disk", "number", number, "hash", hash)
-		// 		snap = s
-		// 		break
-		// 	}
-		// }
+		// If an on-disk checkpoint snapshot can be found, use that
+		if number%checkpointInterval == 0 {
+			if s, err := loadSnapshot(p.config, p.signatures, p.db, number, hash, p.ethAPI); err == nil {
+				log.Trace("Loaded snapshot from disk", "number", number, "hash", hash)
+				snap = s
+				break
+			}
+		}
 
 		// If we're at the genesis, snapshot the initial state.
 		if number == 0 {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
 				// todo bk: commented out, don't need for initial sync
-				// // get checkpoint data
-				// hash := checkpoint.Hash()
+				// get checkpoint data
+				hash := checkpoint.Hash()
 
-				// validatorBytes := checkpoint.Extra[extraVanity : len(checkpoint.Extra)-extraSeal]
-				// // get validators from headers
-				// validators, err := ParseValidators(validatorBytes)
-				// if err != nil {
-				// 	return nil, err
-				// }
+				validatorBytes := checkpoint.Extra[extraVanity : len(checkpoint.Extra)-extraSeal]
+				// get validators from headers
+				validators, err := ParseValidators(validatorBytes)
+				if err != nil {
+					return nil, err
+				}
 
-				// // new snap shot
-				// snap = newSnapshot(p.config, p.signatures, number, hash, validators, p.ethAPI)
-				// if err := snap.store(p.db); err != nil {
-				// 	return nil, err
-				// }
-				// log.Info("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
+				// new snap shot
+				snap = newSnapshot(p.config, p.signatures, number, hash, validators, p.ethAPI)
+				if err := snap.store(p.db); err != nil {
+					return nil, err
+				}
+				log.Info("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
 				break
 			}
 		}
@@ -526,13 +526,13 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 	p.recentSnaps.Add(snap.Hash, snap)
 
 	// todo bk: commented out, don't need for initial sync
-	// // If we've generated a new checkpoint snapshot, save to disk
-	// if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
-	// 	if err = snap.store(p.db); err != nil {
-	// 		return nil, err
-	// 	}
-	// 	log.Trace("Stored snapshot to disk", "number", snap.Number, "hash", snap.Hash)
-	// }
+	// If we've generated a new checkpoint snapshot, save to disk
+	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
+		if err = snap.store(p.db); err != nil {
+			return nil, err
+		}
+		log.Trace("Stored snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+	}
 	return snap, err
 }
 
@@ -563,11 +563,11 @@ func (p *Parlia) verifySeal(chain consensus.ChainHeaderReader, header *types.Hea
 	}
 
 	// todo bk: this breaks the sync, this will still be needed though to verify the headers
-	// // Retrieve the snapshot needed to verify this header and cache it
-	// snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
-	// if err != nil {
-	// 	return err
-	// }
+	// Retrieve the snapshot needed to verify this header and cache it
+	snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
+	if err != nil {
+		return err
+	}
 
 	// // Resolve the authorization key and check against validators
 	signer, err := ecrecover(header, p.signatures, p.chainConfig.ChainID)
@@ -580,29 +580,29 @@ func (p *Parlia) verifySeal(chain consensus.ChainHeaderReader, header *types.Hea
 	}
 
 	// todo bk: this breaks the sync, this will still be needed though to verify the headers
-	// if _, ok := snap.Validators[signer]; !ok {
-	// 	return errUnauthorizedValidator
-	// }
+	if _, ok := snap.Validators[signer]; !ok {
+		return errUnauthorizedValidator
+	}
 
-	// for seen, recent := range snap.Recents {
-	// 	if recent == signer {
-	// 		// Signer is among recents, only fail if the current block doesn't shift it out
-	// 		if limit := uint64(len(snap.Validators)/2 + 1); seen > number-limit {
-	// 			return errRecentlySigned
-	// 		}
-	// 	}
-	// }
+	for seen, recent := range snap.Recents {
+		if recent == signer {
+			// Signer is among recents, only fail if the current block doesn't shift it out
+			if limit := uint64(len(snap.Validators)/2 + 1); seen > number-limit {
+				return errRecentlySigned
+			}
+		}
+	}
 
-	// // Ensure that the difficulty corresponds to the turn-ness of the signer
-	// if !p.fakeDiff {
-	// 	inturn := snap.inturn(signer)
-	// 	if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
-	// 		return errWrongDifficulty
-	// 	}
-	// 	if !inturn && header.Difficulty.Cmp(diffNoTurn) != 0 {
-	// 		return errWrongDifficulty
-	// 	}
-	// }
+	// Ensure that the difficulty corresponds to the turn-ness of the signer
+	if !p.fakeDiff {
+		inturn := snap.inturn(signer)
+		if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
+			return errWrongDifficulty
+		}
+		if !inturn && header.Difficulty.Cmp(diffNoTurn) != 0 {
+			return errWrongDifficulty
+		}
+	}
 
 	return nil
 }
@@ -1207,7 +1207,7 @@ func (p *Parlia) applyTransaction(
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = state.GetLogs(expectedTx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
-	// receipt.BlockHash = state.BlockHash()
+	receipt.BlockHash = state.BlockHash()
 	receipt.BlockNumber = header.Number
 	receipt.TransactionIndex = uint(state.TxIndex())
 	receipts = append(receipts, receipt)
