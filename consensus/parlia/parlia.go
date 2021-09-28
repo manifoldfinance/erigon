@@ -403,7 +403,7 @@ func (p *Parlia) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 		return consensus.ErrUnknownAncestor
 	}
 
-	// todo bk: this breaks the sync, this will still be needed though to verify the headers
+	// todo bk: this was commented because it broke the sync, but it turns out snapshots are needed
 	snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {
 		return err
@@ -454,7 +454,7 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 			break
 		}
 
-		// todo bk: commented out, don't need for initial sync
+		// todo bk: this was commented because it broke the sync, but it turns out snapshots are needed
 		// If an on-disk checkpoint snapshot can be found, use that
 		if number%checkpointInterval == 0 {
 			if s, err := loadSnapshot(p.config, p.signatures, p.db, number, hash, p.ethAPI); err == nil {
@@ -468,7 +468,7 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		if number == 0 {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
-				// todo bk: commented out, don't need for initial sync
+				// todo bk: this was commented because it broke the sync, but it turns out snapshots are needed
 				// get checkpoint data
 				hash := checkpoint.Hash()
 
@@ -525,7 +525,7 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 	}
 	p.recentSnaps.Add(snap.Hash, snap)
 
-	// todo bk: commented out, don't need for initial sync
+	// todo bk: this was commented because it broke the sync, but it turns out snapshots are needed
 	// If we've generated a new checkpoint snapshot, save to disk
 	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
 		if err = snap.store(p.db); err != nil {
@@ -562,7 +562,7 @@ func (p *Parlia) verifySeal(chain consensus.ChainHeaderReader, header *types.Hea
 		return errUnknownBlock
 	}
 
-	// todo bk: this breaks the sync, this will still be needed though to verify the headers
+	// todo bk: this was commented because it broke the sync, but it turns out snapshots are needed
 	// Retrieve the snapshot needed to verify this header and cache it
 	snap, err := p.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {
@@ -579,7 +579,7 @@ func (p *Parlia) verifySeal(chain consensus.ChainHeaderReader, header *types.Hea
 		return errCoinBaseMisMatch
 	}
 
-	// todo bk: this breaks the sync, this will still be needed though to verify the headers
+	// todo bk: this was commented because it broke the sync, but it turns out snapshots are needed
 	if _, ok := snap.Validators[signer]; !ok {
 		return errUnauthorizedValidator
 	}
