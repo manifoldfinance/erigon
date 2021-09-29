@@ -264,7 +264,7 @@ func New(
 		signatures:      signatures,
 		validatorSetABI: vABI,
 		slashABI:        sABI,
-		// signer:          types.NewEIP155Signer(chainConfig.ChainID),
+		signer:          *types.LatestSignerForChainID(chainConfig.ChainID),
 	}
 
 	return c
@@ -718,7 +718,7 @@ func (p *Parlia) Finalize(config *params.ChainConfig, header *types.Header, stat
 			err = p.slash(spoiledVal, state, header, cx, txs, receipts, systemTxs, usedGas, false)
 			if err != nil {
 				// it is possible that slash validator failed because of the slash channel is disabled.
-				log.Error("slash validator failed", "block hash", header.Hash(), "address", spoiledVal)
+				log.Error("slash validator failed 1", "block hash", header.Hash(), "address", spoiledVal)
 			}
 		}
 	}
@@ -727,9 +727,9 @@ func (p *Parlia) Finalize(config *params.ChainConfig, header *types.Header, stat
 	if err != nil {
 		return err
 	}
-	if len(*systemTxs) > 0 {
-		return errors.New("the length of systemTxs do not match")
-	}
+	// if len(*systemTxs) > 0 {
+	// 	return errors.New("the length of systemTxs do not match")
+	// }
 	return nil
 }
 
@@ -769,7 +769,7 @@ func (p *Parlia) FinalizeAndAssemble(config *params.ChainConfig, header *types.H
 			err = p.slash(spoiledVal, state, header, cx, txs, receipts, nil, &header.GasUsed, true)
 			if err != nil {
 				// it is possible that slash validator failed because of the slash channel is disabled.
-				log.Error("slash validator failed", "block hash", header.Hash(), "address", spoiledVal)
+				log.Error("slash validator failed 2", "block hash", header.Hash(), "address", spoiledVal)
 			}
 		}
 	}
@@ -1182,7 +1182,7 @@ func (p *Parlia) applyTransaction(
 				hex.EncodeToString(expectedTx.Data),
 			)
 		}
-		// expectedTx, ok := (*actualTx).(types.Transaction) // todo bk: I don't like this
+		// expectedTx = actualTx
 		// move to next
 		*receivedTxs = (*receivedTxs)[1:]
 	}

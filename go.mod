@@ -2,6 +2,8 @@ module github.com/ledgerwatch/erigon
 
 go 1.16
 
+replace github.com/ledgerwatch/erigon-lib v0.0.0-20210927124510-ffac34a86fd0 => /Users/brendan/code/go/erigon-lib
+
 require (
 	crawshaw.io/sqlite v0.3.3-0.20210127221821-98b1f83c5508 // indirect
 	github.com/BobuSumisu/aho-corasick v1.0.3

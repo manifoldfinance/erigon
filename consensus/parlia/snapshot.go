@@ -85,22 +85,6 @@ func (s validatorsAscending) Less(i, j int) bool { return bytes.Compare(s[i][:],
 func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // // loadSnapshot loads an existing snapshot from the database.
-// func loadSnapshot(config *params.ParliaConfig, sigCache *lru.ARCCache, db ethdb.Database, hash common.Hash, ethAPI *ethapi.PublicBlockChainAPI) (*Snapshot, error) {
-// 	blob, err := db.Get(append([]byte("parlia-"), hash[:]...))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	snap := new(Snapshot)
-// 	if err := json.Unmarshal(blob, snap); err != nil {
-// 		return nil, err
-// 	}
-// 	snap.config = config
-// 	snap.sigCache = sigCache
-// 	snap.ethAPI = ethAPI
-
-// 	return snap, nil
-// }
-
 func loadSnapshot(config *params.ParliaConfig, sigCache *lru.ARCCache, db kv.RwDB, num uint64, hash common.Hash, ethAPI *ethapi.PublicBlockChainAPI) (*Snapshot, error) {
 	tx, err := db.BeginRo(context.Background())
 	if err != nil {
@@ -108,7 +92,7 @@ func loadSnapshot(config *params.ParliaConfig, sigCache *lru.ARCCache, db kv.RwD
 	}
 	defer tx.Rollback()
 	// todo bk: should not be hardcoded, should be added to erigon-lib/kv/tables.go
-	blob, err := tx.GetOne(kv.CliqueSnapshot, SnapshotFullKey(num, hash))
+	blob, err := tx.GetOne(kv.ParliaSnapshot, SnapshotFullKey(num, hash))
 	if err != nil {
 		return nil, err
 	}
@@ -124,15 +108,6 @@ func loadSnapshot(config *params.ParliaConfig, sigCache *lru.ARCCache, db kv.RwD
 	return snap, nil
 }
 
-// // store inserts the snapshot into the database.
-// func (s *Snapshot) store(db ethdb.Database) error {
-// 	blob, err := json.Marshal(s)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return db.Put(append([]byte("parlia-"), s.Hash[:]...), blob)
-// }
-
 // store inserts the snapshot into the database.
 func (s *Snapshot) store(db kv.RwDB) error {
 	blob, err := json.Marshal(s)
@@ -142,7 +117,7 @@ func (s *Snapshot) store(db kv.RwDB) error {
 
 	// todo bk: should not be hardcoded, should be added to erigon-lib/kv/tables.go
 	return db.Update(context.Background(), func(tx kv.RwTx) error {
-		return tx.Put(kv.CliqueSnapshot, SnapshotFullKey(s.Number, s.Hash), blob)
+		return tx.Put(kv.ParliaSnapshot, SnapshotFullKey(s.Number, s.Hash), blob)
 	})
 }
 
