@@ -65,7 +65,7 @@ func DeleteTxLookupEntry(db kv.Deleter, hash common.Hash) error {
 
 // ReadTransaction retrieves a specific transaction from the database, along with
 // its added positional metadata.
-func ReadTransaction(db kv.Tx, hash common.Hash) (types.Transaction, common.Hash, uint64, uint64, error) {
+func ReadTransaction(db kv.Tx, hash common.Hash) (types.TxData, common.Hash, uint64, uint64, error) {
 	blockNumber, err := ReadTxLookupEntry(db, hash)
 	if err != nil {
 		return nil, common.Hash{}, 0, 0, err

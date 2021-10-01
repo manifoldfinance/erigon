@@ -592,7 +592,7 @@ func (h *Header) EmptyReceipts() bool {
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
 type Body struct {
-	Transactions []Transaction
+	Transactions []TxData
 	Uncles       []*Header
 }
 
@@ -647,7 +647,7 @@ type StorageBlock Block
 // "storage" block encoding. used for database.
 type storageblock struct {
 	Header *Header
-	Txs    []Transaction
+	Txs    []TxData
 	Uncles []*Header
 	TD     *big.Int
 }
@@ -872,7 +872,7 @@ func (bb *Body) DecodeRLP(s *rlp.Stream) error {
 	if _, err = s.List(); err != nil {
 		return err
 	}
-	var tx Transaction
+	var tx TxData
 	for tx, err = DecodeTransaction(s); err == nil; tx, err = DecodeTransaction(s) {
 		bb.Transactions = append(bb.Transactions, tx)
 	}
@@ -911,7 +911,7 @@ func (bb *Body) DecodeRLP(s *rlp.Stream) error {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs, uncles
 // and receipts.
-func NewBlock(header *Header, txs []Transaction, uncles []*Header, receipts []*Receipt) *Block {
+func NewBlock(header *Header, txs []TxData, uncles []*Header, receipts []*Receipt) *Block {
 	b := &Block{header: CopyHeader(header), td: new(big.Int)}
 
 	// TODO: panic if len(txs) != len(receipts)
@@ -943,9 +943,17 @@ func NewBlock(header *Header, txs []Transaction, uncles []*Header, receipts []*R
 	return b
 }
 
+func NewBlock2(header *Header, txs []*TxData, uncles []*Header, receipts []*Receipt) *Block {
+	dupTxs := make(Transactions, len(txs))
+	for i, tx := range txs {
+		dupTxs[i] = *tx
+	}
+	return NewBlock(header, dupTxs, uncles, receipts)
+}
+
 // NewBlockFromStorage like NewBlock but used to create Block object when read it from DB
 // in this case no reason to copy parts, or re-calculate headers fields - they are all stored in DB
-func NewBlockFromStorage(hash common.Hash, header *Header, txs []Transaction, uncles []*Header) *Block {
+func NewBlockFromStorage(hash common.Hash, header *Header, txs []TxData, uncles []*Header) *Block {
 	b := &Block{header: header, td: new(big.Int), transactions: txs, uncles: uncles}
 	b.hash.Store(hash)
 	return b
@@ -1001,7 +1009,7 @@ func (bb *Block) DecodeRLP(s *rlp.Stream) error {
 	if _, err = s.List(); err != nil {
 		return err
 	}
-	var tx Transaction
+	var tx TxData
 	for tx, err = DecodeTransaction(s); err == nil; tx, err = DecodeTransaction(s) {
 		bb.transactions = append(bb.transactions, tx)
 	}
@@ -1146,7 +1154,7 @@ func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
 func (b *Block) Uncles() []*Header          { return b.uncles }
 func (b *Block) Transactions() Transactions { return b.transactions }
 
-func (b *Block) Transaction(hash common.Hash) Transaction {
+func (b *Block) Transaction(hash common.Hash) TxData {
 	for _, transaction := range b.transactions {
 		if transaction.Hash() == hash {
 			return transaction
@@ -1257,10 +1265,10 @@ func (b *Block) WithSeal(header *Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []Transaction, uncles []*Header) *Block {
+func (b *Block) WithBody(transactions []TxData, uncles []*Header) *Block {
 	block := &Block{
 		header:       CopyHeader(b.header),
-		transactions: make([]Transaction, len(transactions)),
+		transactions: make([]TxData, len(transactions)),
 		uncles:       make([]*Header, len(uncles)),
 	}
 	copy(block.transactions, transactions)

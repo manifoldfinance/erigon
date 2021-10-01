@@ -47,7 +47,7 @@ const (
 )
 
 // Transaction is an Ethereum transaction.
-type Transaction interface {
+type TxData interface {
 	Type() byte
 	GetChainID() *uint256.Int
 	GetNonce() uint64
@@ -61,8 +61,8 @@ type Transaction interface {
 	Time() time.Time
 	GetTo() *common.Address
 	AsMessage(s Signer, baseFee *big.Int) (Message, error)
-	WithSignature(signer Signer, sig []byte) (Transaction, error)
-	FakeSign(address common.Address) (Transaction, error)
+	WithSignature(signer Signer, sig []byte) (TxData, error)
+	FakeSign(address common.Address) (TxData, error)
 	Hash() common.Hash
 	SigningHash(chainID *big.Int) common.Hash
 	Size() common.StorageSize
@@ -83,10 +83,27 @@ type Transaction interface {
 	SetSender(common.Address)
 }
 
-// TransactionMisc is collection of miscelaneous fields for transaction that is supposed to be embedded into concrete
+// NewTx creates a new transaction.
+func NewTx(inner TxData) *Transaction {
+	tx := new(Transaction)
+	tx.setDecoded(copy2(inner), 0)
+	return tx
+}
+
+// setDecoded sets the inner transaction and size after decoding.
+func (tx *Transaction) setDecoded(inner TxData, size int) {
+	tx.inner = inner
+	tx.time = time.Now()
+	if size > 0 {
+		tx.size.Store(common.StorageSize(size))
+	}
+}
+
+// Transaction is collection of miscelaneous fields for transaction that is supposed to be embedded into concrete
 // implementations of different transaction types
-type TransactionMisc struct {
-	time time.Time // Time first seen locally (spam avoidance)
+type Transaction struct {
+	inner TxData // Consensus contents of a transaction
+	time time.Time    // Time first seen locally (spam avoidance)
 
 	// caches
 	hash atomic.Value //nolint:structcheck
@@ -94,15 +111,15 @@ type TransactionMisc struct {
 	from atomic.Value
 }
 
-func (tm TransactionMisc) Time() time.Time {
+func (tm Transaction) Time() time.Time {
 	return tm.time
 }
 
-func (tm TransactionMisc) From() *atomic.Value {
+func (tm Transaction) From() *atomic.Value {
 	return &tm.from
 }
 
-func DecodeTransaction(s *rlp.Stream) (Transaction, error) {
+func DecodeTransaction(s *rlp.Stream) (TxData, error) {
 	kind, size, err := s.Kind()
 	if err != nil {
 		return nil, err
@@ -124,7 +141,7 @@ func DecodeTransaction(s *rlp.Stream) (Transaction, error) {
 	if len(b) != 1 {
 		return nil, fmt.Errorf("only 1-byte tx type prefix is supported, got %d bytes", len(b))
 	}
-	var tx Transaction
+	var tx TxData
 	switch b[0] {
 	case AccessListTxType:
 		t := &AccessListTx{}
@@ -149,7 +166,7 @@ func DecodeTransaction(s *rlp.Stream) (Transaction, error) {
 	return tx, nil
 }
 
-func UnmarshalTransactionFromBinary(data []byte) (Transaction, error) {
+func UnmarshalTransactionFromBinary(data []byte) (TxData, error) {
 	s := rlp.NewStream(bytes.NewReader(data), uint64(len(data)))
 	return DecodeTransaction(s)
 }
@@ -173,8 +190,8 @@ func MarshalTransactionsBinary(txs Transactions) ([][]byte, error) {
 	return result, nil
 }
 
-func DecodeTransactions(txs [][]byte) ([]Transaction, error) {
-	result := make([]Transaction, len(txs))
+func DecodeTransactions(txs [][]byte) ([]TxData, error) {
+	result := make([]TxData, len(txs))
 	var err error
 	for i := range txs {
 		s := rlp.NewStream(bytes.NewReader(txs[i]), uint64(len(txs[i])))
@@ -222,7 +239,7 @@ func isProtectedV(V *uint256.Int) bool {
 }
 
 // Transactions implements DerivableList for transactions.
-type Transactions []Transaction
+type Transactions []TxData
 
 // Len returns the length of s.
 func (s Transactions) Len() int { return len(s) }
@@ -283,7 +300,7 @@ func (s TxByPriceAndTime) Less(i, j int) bool {
 func (s TxByPriceAndTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s *TxByPriceAndTime) Push(x interface{}) {
-	*s = append(*s, x.(Transaction))
+	*s = append(*s, x.(TxData))
 }
 
 func (s *TxByPriceAndTime) Pop() interface{} {
@@ -350,7 +367,7 @@ func (t *TransactionsByPriceAndNonce) Empty() bool {
 }
 
 // Peek returns the next transaction by price.
-func (t *TransactionsByPriceAndNonce) Peek() Transaction {
+func (t *TransactionsByPriceAndNonce) Peek() TxData {
 	if len(t.heads) == 0 {
 		return nil
 	}
@@ -402,7 +419,7 @@ func (t *TransactionsFixedOrder) Empty() bool {
 }
 
 // Peek returns the next transaction by price.
-func (t *TransactionsFixedOrder) Peek() Transaction {
+func (t *TransactionsFixedOrder) Peek() TxData {
 	if len(t.Transactions) == 0 {
 		return nil
 	}

@@ -34,7 +34,7 @@ import (
 
 // SignerFn is a signer function callback when a contract requires a method to
 // sign the transaction before submission.
-type SignerFn func(common.Address, types.Transaction) (types.Transaction, error)
+type SignerFn func(common.Address, types.TxData) (types.TxData, error)
 
 // CallOpts is the collection of options to fine tune a contract call request.
 type CallOpts struct {

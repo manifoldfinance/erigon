@@ -62,7 +62,7 @@ func (tx AccessListTx) copy() *AccessListTx {
 	cpy := &AccessListTx{
 		LegacyTx: LegacyTx{
 			CommonTx: CommonTx{
-				TransactionMisc: TransactionMisc{
+				Transaction: Transaction{
 					time: tx.time,
 				},
 				Nonce: tx.Nonce,
@@ -558,7 +558,7 @@ func (tx AccessListTx) AsMessage(s Signer, _ *big.Int) (Message, error) {
 	return msg, err
 }
 
-func (tx *AccessListTx) WithSignature(signer Signer, sig []byte) (Transaction, error) {
+func (tx *AccessListTx) WithSignature(signer Signer, sig []byte) (TxData, error) {
 	cpy := tx.copy()
 	r, s, v, err := signer.SignatureValues(tx, sig)
 	if err != nil {
@@ -570,7 +570,7 @@ func (tx *AccessListTx) WithSignature(signer Signer, sig []byte) (Transaction, e
 	cpy.ChainID = signer.ChainID()
 	return cpy, nil
 }
-func (tx *AccessListTx) FakeSign(address common.Address) (Transaction, error) {
+func (tx *AccessListTx) FakeSign(address common.Address) (TxData, error) {
 	cpy := tx.copy()
 	cpy.R.Set(u256.Num1)
 	cpy.S.Set(u256.Num1)

@@ -30,7 +30,7 @@ import (
 )
 
 type CommonTx struct {
-	TransactionMisc
+	Transaction
 	Nonce   uint64          // nonce of sender account
 	Gas     uint64          // gas limit
 	To      *common.Address `rlp:"nil"` // nil means contract creation
@@ -115,6 +115,21 @@ func NewTransaction(nonce uint64, to common.Address, amount *uint256.Int, gasLim
 	}
 }
 
+// NewTransaction creates an unsigned legacy transaction.
+// Deprecated: use NewTx instead.
+func NewTransaction2(nonce uint64, to common.Address, amount *uint256.Int, gasLimit uint64, gasPrice *uint256.Int, data []byte) *Transaction {
+	return NewTx(&LegacyTx{
+		CommonTx: CommonTx{
+			Nonce: nonce,
+			To:    &to,
+			Value: amount,
+			Gas:   gasLimit,
+			Data:  data,
+		},
+		GasPrice: gasPrice,
+	})
+}
+
 // NewContractCreation creates an unsigned legacy transaction.
 // Deprecated: use NewTx instead.
 func NewContractCreation(nonce uint64, amount *uint256.Int, gasLimit uint64, gasPrice *uint256.Int, data []byte) *LegacyTx {
@@ -133,7 +148,7 @@ func NewContractCreation(nonce uint64, amount *uint256.Int, gasLimit uint64, gas
 func (tx LegacyTx) copy() *LegacyTx {
 	cpy := &LegacyTx{
 		CommonTx: CommonTx{
-			TransactionMisc: TransactionMisc{
+			Transaction: Transaction{
 				time: tx.time,
 			},
 			Nonce: tx.Nonce,
@@ -154,6 +169,36 @@ func (tx LegacyTx) copy() *LegacyTx {
 	cpy.V.Set(&tx.V)
 	cpy.R.Set(&tx.R)
 	cpy.S.Set(&tx.S)
+	return cpy
+}
+
+func copy2(tx TxData) TxData {
+	cpy := &LegacyTx{
+		CommonTx: CommonTx{
+			Transaction: Transaction{
+				time: tx.Time(),
+			},
+			Nonce: tx.GetNonce(),
+			To:    tx.GetTo(), // TODO: copy pointed-to address
+			Data:  common.CopyBytes(tx.GetData()),
+			Gas:   tx.GetGas(),
+			// These are initialized below.
+			Value: new(uint256.Int),
+		},
+		GasPrice: new(uint256.Int),
+	}
+	if tx.GetValue() != nil {
+		cpy.Value.Set(tx.GetValue())
+	}
+	if tx.GetPrice() != nil {
+		cpy.GasPrice.Set(tx.GetPrice())
+	}
+
+	v, r, s := tx.RawSignatureValues()
+
+	cpy.V.Set(v)
+	cpy.R.Set(r)
+	cpy.S.Set(s)
 	return cpy
 }
 
@@ -446,7 +491,7 @@ func (tx LegacyTx) AsMessage(s Signer, _ *big.Int) (Message, error) {
 	return msg, err
 }
 
-func (tx *LegacyTx) WithSignature(signer Signer, sig []byte) (Transaction, error) {
+func (tx *LegacyTx) WithSignature(signer Signer, sig []byte) (TxData, error) {
 	cpy := tx.copy()
 	r, s, v, err := signer.SignatureValues(tx, sig)
 	if err != nil {
@@ -458,7 +503,7 @@ func (tx *LegacyTx) WithSignature(signer Signer, sig []byte) (Transaction, error
 	return cpy, nil
 }
 
-func (tx *LegacyTx) FakeSign(address common.Address) (Transaction, error) {
+func (tx *LegacyTx) FakeSign(address common.Address) (TxData, error) {
 	cpy := tx.copy()
 	cpy.R.Set(u256.Num1)
 	cpy.S.Set(u256.Num1)

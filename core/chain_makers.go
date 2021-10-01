@@ -44,7 +44,7 @@ type BlockGen struct {
 	ibs         *state.IntraBlockState
 
 	gasPool  *GasPool
-	txs      []types.Transaction
+	txs      []*types.Transaction
 	receipts []*types.Receipt
 	uncles   []*types.Header
 
@@ -115,7 +115,7 @@ func (b *BlockGen) AddTxWithChain(getHeader func(hash common.Hash, number uint64
 	if err != nil {
 		panic(err)
 	}
-	b.txs = append(b.txs, tx)
+	b.txs = append(b.txs, &tx)
 	b.receipts = append(b.receipts, receipt)
 }
 
@@ -127,7 +127,7 @@ func (b *BlockGen) AddFailedTxWithChain(getHeader func(hash common.Hash, number 
 	contractHasTEVM := func(common.Hash) (bool, error) { return false, nil }
 	receipt, _, err := ApplyTransaction(b.config, getHeader, engine, &b.header.Coinbase, b.gasPool, b.ibs, state.NewNoopWriter(), b.header, tx, &b.header.GasUsed, vm.Config{}, contractHasTEVM)
 	_ = err // accept failed transactions
-	b.txs = append(b.txs, tx)
+	b.txs = append(b.txs, &tx)
 	b.receipts = append(b.receipts, receipt)
 }
 
@@ -137,7 +137,7 @@ func (b *BlockGen) AddFailedTxWithChain(getHeader func(hash common.Hash, number 
 // AddUncheckedTx will cause consensus failures when used during real
 // chain processing. This is best used in conjunction with raw block insertion.
 func (b *BlockGen) AddUncheckedTx(tx types.Transaction) {
-	b.txs = append(b.txs, tx)
+	b.txs = append(b.txs, &tx)
 }
 
 // Number returns the block number of the block being generated.
@@ -256,7 +256,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 
 	genblock := func(i int, parent *types.Block, ibs *state.IntraBlockState, stateReader state.StateReader,
 		plainStateWriter *state.PlainStateWriter) (*types.Block, types.Receipts, error) {
-		b := &BlockGen{i: i, chain: blocks, parent: parent, ibs: ibs, stateReader: stateReader, config: config, engine: engine, txs: make([]types.Transaction, 0, 1), receipts: make([]*types.Receipt, 0, 1), uncles: make([]*types.Header, 0, 1)}
+		b := &BlockGen{i: i, chain: blocks, parent: parent, ibs: ibs, stateReader: stateReader, config: config, engine: engine, txs: make([]*types.Transaction, 0, 1), receipts: make([]*types.Receipt, 0, 1), uncles: make([]*types.Header, 0, 1)}
 		b.header = makeHeader(chainreader, parent, ibs, b.engine)
 		// Mutate the state and block according to any hard-fork specs
 		if daoBlock := config.DAOForkBlock; daoBlock != nil {
@@ -360,7 +360,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			}
 
 			// Recreating block to make sure Root makes it into the header
-			block := types.NewBlock(b.header, b.txs, b.uncles, b.receipts)
+			block := types.NewBlock2(b.header, b.txs, b.uncles, b.receipts)
 			return block, b.receipts, nil
 		}
 		return nil, nil, fmt.Errorf("no engine to generate blocks")

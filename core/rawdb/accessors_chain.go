@@ -259,14 +259,14 @@ func ReadStorageBodyRLP(db kv.Getter, hash common.Hash, number uint64) rlp.RawVa
 	return bodyRlp
 }
 
-func ReadTransactions(db kv.Getter, baseTxId uint64, amount uint32) ([]types.Transaction, error) {
+func ReadTransactions(db kv.Getter, baseTxId uint64, amount uint32) ([]types.TxData, error) {
 	if amount == 0 {
-		return []types.Transaction{}, nil
+		return []types.TxData{}, nil
 	}
 	txIdKey := make([]byte, 8)
 	reader := bytes.NewReader(nil)
 	stream := rlp.NewStream(reader, 0)
-	txs := make([]types.Transaction, amount)
+	txs := make([]types.TxData, amount)
 	binary.BigEndian.PutUint64(txIdKey, baseTxId)
 	i := uint32(0)
 
@@ -286,7 +286,7 @@ func ReadTransactions(db kv.Getter, baseTxId uint64, amount uint32) ([]types.Tra
 	return txs, nil
 }
 
-func WriteTransactions(db kv.RwTx, txs []types.Transaction, baseTxId uint64) error {
+func WriteTransactions(db kv.RwTx, txs []types.TxData, baseTxId uint64) error {
 	txId := baseTxId
 	buf := bytes.NewBuffer(nil)
 	c, err := db.RwCursor(kv.EthTx)

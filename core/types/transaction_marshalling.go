@@ -92,7 +92,7 @@ func (tx DynamicFeeTransaction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&enc)
 }
 
-func UnmarshalTransactionFromJSON(input []byte) (Transaction, error) {
+func UnmarshalTransactionFromJSON(input []byte) (TxData, error) {
 	var p fastjson.Parser
 	v, err := p.ParseBytes(input)
 	if err != nil {

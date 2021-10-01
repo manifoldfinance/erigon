@@ -47,11 +47,11 @@ func (c *powEngine) Prepare(chain consensus.ChainHeaderReader, header *types.Hea
 func (c *powEngine) Initialize(config *params.ChainConfig, chain consensus.ChainHeaderReader, e consensus.EpochReader, header *types.Header, txs []types.Transaction, uncles []*types.Header, syscall consensus.SystemCall) {
 	panic("must not be called")
 }
-func (c *powEngine) Finalize(config *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []types.Transaction, uncles []*types.Header, receipts types.Receipts, systemTxs *[]*types.Transaction, usedGas *uint64, e consensus.EpochReader, chain consensus.ChainHeaderReader, syscall consensus.SystemCall) error {
+func (c *powEngine) Finalize(config *params.ChainConfig, header *types.Header, state *state.IntraBlockState, txs []*types.Transaction, uncles []*types.Header, receipts types.Receipts, systemTxs *[]*types.Transaction, usedGas *uint64, e consensus.EpochReader, chain consensus.ChainHeaderReader, syscall consensus.SystemCall) error {
 	panic("must not be called")
 }
 func (c *powEngine) FinalizeAndAssemble(chainConfig *params.ChainConfig, header *types.Header, state *state.IntraBlockState,
-	txs []types.Transaction, uncles []*types.Header, receipts types.Receipts,
+	txs []*types.Transaction, uncles []*types.Header, receipts types.Receipts,
 	e consensus.EpochReader, h consensus.ChainHeaderReader, syscall consensus.SystemCall, call consensus.Call) (*types.Block, []*types.Receipt, error) {
 	panic("must not be called")
 }

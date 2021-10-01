@@ -68,7 +68,7 @@ func (tx DynamicFeeTransaction) Cost() *uint256.Int {
 func (tx DynamicFeeTransaction) copy() *DynamicFeeTransaction {
 	cpy := &DynamicFeeTransaction{
 		CommonTx: CommonTx{
-			TransactionMisc: TransactionMisc{
+			Transaction: Transaction{
 				time: tx.time,
 			},
 			Nonce: tx.Nonce,
@@ -221,7 +221,7 @@ func (tx DynamicFeeTransaction) payloadSize() (payloadSize int, nonceLen, gasLen
 	return payloadSize, nonceLen, gasLen, accessListLen
 }
 
-func (tx *DynamicFeeTransaction) WithSignature(signer Signer, sig []byte) (Transaction, error) {
+func (tx *DynamicFeeTransaction) WithSignature(signer Signer, sig []byte) (TxData, error) {
 	cpy := tx.copy()
 	r, s, v, err := signer.SignatureValues(tx, sig)
 	if err != nil {
@@ -234,7 +234,7 @@ func (tx *DynamicFeeTransaction) WithSignature(signer Signer, sig []byte) (Trans
 	return cpy, nil
 }
 
-func (tx *DynamicFeeTransaction) FakeSign(address common.Address) (Transaction, error) {
+func (tx *DynamicFeeTransaction) FakeSign(address common.Address) (TxData, error) {
 	cpy := tx.copy()
 	cpy.R.Set(u256.Num1)
 	cpy.S.Set(u256.Num1)

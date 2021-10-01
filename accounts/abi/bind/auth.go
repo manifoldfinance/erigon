@@ -43,13 +43,13 @@ func NewKeyedTransactor(key *ecdsa.PrivateKey) *TransactOpts {
 	signer := types.LatestSignerForChainID(nil)
 	return &TransactOpts{
 		From: keyAddr,
-		Signer: func(address common.Address, tx types.Transaction) (types.Transaction, error) {
+		Signer: func(address common.Address, tx types.TxData) (types.TxData, error) {
 			if address != keyAddr {
-				return nil, ErrNotAuthorized
+				return types.TxData{}, ErrNotAuthorized
 			}
 			signature, err := crypto.Sign(tx.SigningHash(nil).Bytes(), key)
 			if err != nil {
-				return nil, err
+				return types.TxData{}, err
 			}
 			return tx.WithSignature(*signer, signature)
 		},

@@ -131,7 +131,7 @@ func LatestSignerForChainID(chainID *big.Int) *Signer {
 }
 
 // SignTx signs the transaction using the given signer and private key.
-func SignTx(tx Transaction, s Signer, prv *ecdsa.PrivateKey) (Transaction, error) {
+func SignTx(tx TxData, s Signer, prv *ecdsa.PrivateKey) (TxData, error) {
 	h := tx.SigningHash(s.chainID.ToBig())
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
@@ -141,7 +141,7 @@ func SignTx(tx Transaction, s Signer, prv *ecdsa.PrivateKey) (Transaction, error
 }
 
 // SignNewTx creates a transaction and signs it.
-func SignNewTx(prv *ecdsa.PrivateKey, s Signer, tx Transaction) (Transaction, error) {
+func SignNewTx(prv *ecdsa.PrivateKey, s Signer, tx TxData) (TxData, error) {
 	h := tx.SigningHash(s.chainID.ToBig())
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
@@ -152,7 +152,7 @@ func SignNewTx(prv *ecdsa.PrivateKey, s Signer, tx Transaction) (Transaction, er
 
 // MustSignNewTx creates a transaction and signs it.
 // This panics if the transaction cannot be signed.
-func MustSignNewTx(prv *ecdsa.PrivateKey, s Signer, tx Transaction) Transaction {
+func MustSignNewTx(prv *ecdsa.PrivateKey, s Signer, tx TxData) TxData {
 	tx1, err := SignNewTx(prv, s, tx)
 	if err != nil {
 		panic(err)
@@ -180,12 +180,12 @@ func (sg Signer) String() string {
 }
 
 // Sender returns the sender address of the transaction.
-func (sg Signer) Sender(tx Transaction) (common.Address, error) {
+func (sg Signer) Sender(tx TxData) (common.Address, error) {
 	return sg.SenderWithContext(secp256k1.DefaultContext, tx)
 }
 
 // SenderWithContext returns the sender address of the transaction.
-func (sg Signer) SenderWithContext(context *secp256k1.Context, tx Transaction) (common.Address, error) {
+func (sg Signer) SenderWithContext(context *secp256k1.Context, tx TxData) (common.Address, error) {
 	var V uint256.Int
 	var R, S *uint256.Int
 	signChainID := sg.chainID.ToBig() // This is reset to nil if tx is unprotected
@@ -247,7 +247,7 @@ func (sg Signer) SenderWithContext(context *secp256k1.Context, tx Transaction) (
 
 // SignatureValues returns the raw R, S, V values corresponding to the
 // given signature.
-func (sg Signer) SignatureValues(tx Transaction, sig []byte) (R, S, V *uint256.Int, err error) {
+func (sg Signer) SignatureValues(tx TxData, sig []byte) (R, S, V *uint256.Int, err error) {
 	switch t := tx.(type) {
 	case *LegacyTx:
 		R, S, V = decodeSignature(sig)
@@ -359,7 +359,7 @@ func DeriveChainId(v *uint256.Int) *uint256.Int {
 
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
-func (sg Signer) Hash(tx Transaction) common.Hash {
+func (sg Signer) Hash(tx TxData) common.Hash {
 	return rlpHash([]interface{}{
 		tx.GetNonce(),
 		tx.GetPrice(), // todo bk: this was tx.GasPrice need to make sure tx.GetPrice() is what we want
