@@ -1182,7 +1182,7 @@ func (p *Parlia) applyTransaction(
 				hex.EncodeToString(expectedTx.Data),
 			)
 		}
-		// expectedTx = actualTx
+		expectedTx = actualTx
 		// move to next
 		*receivedTxs = (*receivedTxs)[1:]
 	}
