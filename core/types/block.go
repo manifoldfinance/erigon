@@ -943,6 +943,14 @@ func NewBlock(header *Header, txs []Transaction, uncles []*Header, receipts []*R
 	return b
 }
 
+func NewBlock2(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt) *Block {
+	dupTxs := make(Transactions, len(txs))
+	for i, tx := range txs {
+		dupTxs[i] = *tx
+	}
+	return NewBlock(header, dupTxs, uncles, receipts)
+}
+
 // NewBlockFromStorage like NewBlock but used to create Block object when read it from DB
 // in this case no reason to copy parts, or re-calculate headers fields - they are all stored in DB
 func NewBlockFromStorage(hash common.Hash, header *Header, txs []Transaction, uncles []*Header) *Block {

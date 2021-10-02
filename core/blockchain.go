@@ -119,6 +119,7 @@ func ExecuteBlockEphemerally(
 	}
 	noop := state.NewNoopWriter()
 	posa, isPoSA := engine.(consensus.PoSA)
+	userTxs := make([]*types.Transaction, 0, len(block.Transactions()))
 	systemTxs := make([]*types.Transaction, 0, 2)
 	//fmt.Printf("====txs processing start: %d====\n", block.NumberU64())
 	for i, tx := range block.Transactions() {
@@ -128,6 +129,8 @@ func ExecuteBlockEphemerally(
 			} else if isSystemTx {
 				systemTxs = append(systemTxs, &tx)
 				continue
+			} else {
+				userTxs = append(userTxs, &tx)
 			}
 		}
 
@@ -181,7 +184,7 @@ func ExecuteBlockEphemerally(
 	// }
 
 	if !vmConfig.ReadOnly {
-		if err := FinalizeBlockExecution(engine, stateReader, block.Header(), block.Transactions(), block.Uncles(), stateWriter, chainConfig, ibs, receipts, systemTxs, usedGas, epochReader, chainReader); err != nil {
+		if err := FinalizeBlockExecution(engine, stateReader, block.Header(), userTxs, block.Uncles(), stateWriter, chainConfig, ibs, receipts, systemTxs, usedGas, epochReader, chainReader); err != nil {
 			return nil, err
 		}
 	}
@@ -251,7 +254,7 @@ func CallContractTx(contract common.Address, data []byte, ibs *state.IntraBlockS
 	return tx.FakeSign(from)
 }
 
-func FinalizeBlockExecution(engine consensus.Engine, stateReader state.StateReader, header *types.Header, txs []types.Transaction, uncles []*types.Header, stateWriter state.WriterWithChangeSets, cc *params.ChainConfig, ibs *state.IntraBlockState, receipts types.Receipts, systemTxs []*types.Transaction, usedGas *uint64, e consensus.EpochReader, headerReader consensus.ChainHeaderReader) error {
+func FinalizeBlockExecution(engine consensus.Engine, stateReader state.StateReader, header *types.Header, txs []*types.Transaction, uncles []*types.Header, stateWriter state.WriterWithChangeSets, cc *params.ChainConfig, ibs *state.IntraBlockState, receipts types.Receipts, systemTxs []*types.Transaction, usedGas *uint64, e consensus.EpochReader, headerReader consensus.ChainHeaderReader) error {
 	//ibs.Print(cc.Rules(header.Number.Uint64()))
 	//fmt.Printf("====tx processing end====\n")
 
