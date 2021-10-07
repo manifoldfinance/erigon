@@ -2,7 +2,6 @@ package parlia
 
 import (
 	"bytes"
-	// "context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -701,7 +700,7 @@ func (p *Parlia) Finalize(config *params.ChainConfig, header *types.Header, stat
 	if header.Number.Cmp(common.Big1) == 0 {
 		err := p.initContract(state, header, cx, txs, receipts, systemTxs, usedGas, false)
 		if err != nil {
-			log.Error("init contract failed")
+			log.Error("init contract failed 1")
 		}
 	}
 	if header.Difficulty.Cmp(diffInTurn) != 0 {
@@ -748,7 +747,7 @@ func (p *Parlia) FinalizeAndAssemble(config *params.ChainConfig, header *types.H
 	if header.Number.Cmp(common.Big1) == 0 {
 		err := p.initContract(state, header, cx, txs, receipts, nil, &header.GasUsed, true)
 		if err != nil {
-			log.Error("init contract failed")
+			log.Error("init contract failed 2")
 		}
 	}
 	if header.Difficulty.Cmp(diffInTurn) != 0 {
@@ -979,30 +978,17 @@ func (p *Parlia) Close() error {
 
 // getCurrentValidators get current validators
 func (p *Parlia) getCurrentValidators(blockHash common.Hash, syscall consensus.SystemCall) ([]common.Address, error) {
-	// block
-	// blockNr := rpc.BlockNumberOrHashWithHash(blockHash, false)
-
 	// method
 	method := "getValidators"
-
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel() // cancel when we are finished consuming integers
 
 	data, err := p.validatorSetABI.Pack(method)
 	if err != nil {
 		log.Error("Unable to pack tx for getValidators", "error", err)
 		return nil, err
 	}
-	// call
-	// msgData := (hexutil.Bytes)(data)
-	toAddress := common.HexToAddress(systemcontracts.ValidatorContract)
-	// gas := (hexutil.Uint64)(uint64(math.MaxUint64 / 2))
-	// result, err := p.ethAPI.Call(ctx, ethapi.CallArgs{
-	// 	Gas:  &gas,
-	// 	To:   &toAddress,
-	// 	Data: &msgData,
-	// }, blockNr, nil)
 
+	// call
+	toAddress := common.HexToAddress(systemcontracts.ValidatorContract)
 	result, err := syscall(toAddress, data)
 
 	if err != nil {
@@ -1059,7 +1045,6 @@ func (p *Parlia) slash(spoiledVal common.Address, state *state.IntraBlockState, 
 	txs []*types.Transaction, receipts types.Receipts, receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool) error {
 	// method
 	method := "slash"
-
 	// get packed data
 	data, err := p.slashABI.Pack(method,
 		spoiledVal,
@@ -1159,10 +1144,20 @@ func (p *Parlia) applyTransaction(
 	receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool,
 ) (err error) {
 	nonce := state.GetNonce(msg.From())
-	expectedTx := types.NewTransaction(nonce, *msg.To(), msg.Value(), msg.Gas(), msg.GasPrice(), msg.Data())
+	var expectedTx types.Transaction
+	initExpectedTx := types.NewTransaction(nonce, *msg.To(), msg.Value(), msg.Gas(), msg.GasPrice(), msg.Data(), u256.Num148)
+
+	expectedTx = func(initExpectedTx interface{}) types.Transaction {
+		expectedTx, ok := initExpectedTx.(types.Transaction)
+		if !ok {
+			panic("Oops")
+		}
+		return expectedTx
+	} (initExpectedTx)
+
 	expectedHash := p.signer.Hash(expectedTx)
 	if msg.From() == p.val && mining {
-		expectedTx, err = p.signTxFnLegacy(accounts.Account{Address: msg.From()}, expectedTx, p.chainConfig.ChainID)
+		expectedTx, err = p.signTxFnLegacy(accounts.Account{Address: msg.From()}, initExpectedTx, p.chainConfig.ChainID)
 		if err != nil {
 			return err
 		}
@@ -1170,19 +1165,21 @@ func (p *Parlia) applyTransaction(
 		if receivedTxs == nil || len(*receivedTxs) == 0 || (*receivedTxs)[0] == nil {
 			return errors.New("supposed to get a actual transaction, but get none")
 		}
+
 		actualTx := (*receivedTxs)[0]
+
 		if !bytes.Equal(p.signer.Hash(*actualTx).Bytes(), expectedHash.Bytes()) {
 			actualHash := (*actualTx).Hash()
 			return fmt.Errorf("expected tx hash %v, get %v, nonce %d, to %s, value %s, gas %d, gasPrice %s, data %s", expectedHash.String(), actualHash.String(),
-				expectedTx.Nonce,
-				expectedTx.To.String(),
-				expectedTx.Value.String(),
-				expectedTx.Gas,
-				expectedTx.GasPrice.String(),
-				hex.EncodeToString(expectedTx.Data),
+				initExpectedTx.Nonce,
+				initExpectedTx.To.String(),
+				initExpectedTx.Value.String(),
+				initExpectedTx.Gas,
+				initExpectedTx.GasPrice.String(),
+				hex.EncodeToString(initExpectedTx.Data),
 			)
 		}
-		expectedTx = actualTx
+		expectedTx = *actualTx
 		// move to next
 		*receivedTxs = (*receivedTxs)[1:]
 	}
@@ -1191,7 +1188,7 @@ func (p *Parlia) applyTransaction(
 	if err != nil {
 		return err
 	}
-	// txs = append(txs, expectedTx)
+	txs = append(txs, &expectedTx)
 	// var root []byte
 	if p.chainConfig.IsByzantiumBigInt(header.Number) {
 		// state.Finalise(true)

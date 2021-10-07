@@ -30,6 +30,7 @@ import (
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/consensus/misc"
 	"github.com/ledgerwatch/erigon/core/state"
+	"github.com/ledgerwatch/erigon/core/systemcontracts"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/types/accounts"
 	"github.com/ledgerwatch/erigon/core/vm"
@@ -117,6 +118,9 @@ func ExecuteBlockEphemerally(
 	if chainConfig.DAOForkSupport && chainConfig.DAOForkBlock != nil && chainConfig.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(ibs)
 	}
+
+	systemcontracts.UpgradeBuildInSystemContract(chainConfig, block.Number(), ibs)
+
 	noop := state.NewNoopWriter()
 	posa, isPoSA := engine.(consensus.PoSA)
 	userTxs := make([]*types.Transaction, 0, len(block.Transactions()))
@@ -165,6 +169,12 @@ func ExecuteBlockEphemerally(
 		}
 	}
 
+	if !vmConfig.ReadOnly {
+		if err := FinalizeBlockExecution(engine, stateReader, block.Header(), userTxs, block.Uncles(), stateWriter, chainConfig, ibs, receipts, systemTxs, usedGas, epochReader, chainReader); err != nil {
+			return nil, err
+		}
+	}
+
 	// if chainConfig.IsByzantium(header.Number.Uint64()) && !vmConfig.NoReceipts {
 	// 	receiptSha := types.DeriveSha(receipts)
 	// 	if receiptSha != block.Header().ReceiptHash {
@@ -183,11 +193,6 @@ func ExecuteBlockEphemerally(
 	// 	}
 	// }
 
-	if !vmConfig.ReadOnly {
-		if err := FinalizeBlockExecution(engine, stateReader, block.Header(), userTxs, block.Uncles(), stateWriter, chainConfig, ibs, receipts, systemTxs, usedGas, epochReader, chainReader); err != nil {
-			return nil, err
-		}
-	}
 
 	return receipts, nil
 }
@@ -221,7 +226,7 @@ func SysCallContract(contract common.Address, data []byte, chainConfig params.Ch
 // from the null sender, with 50M gas.
 func SysCallContractTx(contract common.Address, data []byte) (tx types.Transaction, err error) {
 	//nonce := ibs.GetNonce(SystemAddress)
-	tx = types.NewTransaction(0, contract, u256.Num0, 50_000_000, u256.Num0, data)
+	tx = types.NewTransaction(0, contract, u256.Num0, 50_000_000, u256.Num0, data, u256.Num148)
 	return tx.FakeSign(state.SystemAddress)
 }
 
@@ -250,7 +255,7 @@ func CallContract(contract common.Address, data []byte, chainConfig params.Chain
 func CallContractTx(contract common.Address, data []byte, ibs *state.IntraBlockState) (tx types.Transaction, err error) {
 	from := common.Address{}
 	nonce := ibs.GetNonce(from)
-	tx = types.NewTransaction(nonce, contract, u256.Num0, 50_000_000, u256.Num0, data)
+	tx = types.NewTransaction(nonce, contract, u256.Num0, 50_000_000, u256.Num0, data, u256.Num148)
 	return tx.FakeSign(from)
 }
 
