@@ -126,7 +126,9 @@ func ExecuteBlockEphemerally(
 	userTxs := make([]*types.Transaction, 0, len(block.Transactions()))
 	systemTxs := make([]*types.Transaction, 0, 2)
 	//fmt.Printf("====txs processing start: %d====\n", block.NumberU64())
-	for i, tx := range block.Transactions() {
+	for i, initTx := range block.Transactions() {
+		// Needed for proper memory address reference in systemTxs/userTxs
+		tx := initTx
 		if isPoSA {
 			if isSystemTx, err := posa.IsSystemTransaction(&tx, block.Header()); err != nil {
 				return nil, err
