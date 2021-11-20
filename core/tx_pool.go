@@ -150,6 +150,8 @@ type TxPoolConfig struct {
 	AccountQueue uint64 // Maximum number of non-executable transaction slots permitted per account
 	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
 
+	GlobalBaseFeeQueue uint64 // Maximum number of non-executable transaction slots for all accounts
+
 	Lifetime    time.Duration // Maximum amount of time non-executable transaction are queued
 	StartOnInit bool
 }
@@ -163,10 +165,11 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceLimit: 1,
 	PriceBump:  10,
 
-	AccountSlots: 16,
-	GlobalSlots:  4096,
-	AccountQueue: 64,
-	GlobalQueue:  1024,
+	AccountSlots:       16,
+	GlobalSlots:        10_000,
+	GlobalBaseFeeQueue: 30_000,
+	AccountQueue:       64,
+	GlobalQueue:        30_000,
 
 	Lifetime: 3 * time.Hour,
 }
@@ -364,7 +367,7 @@ func (pool *TxPool) loop() {
 			pool.mu.RUnlock()
 
 			if pending != prevPending || queued != prevQueued || stales != prevStales {
-				log.Debug("Transaction pool status report", "executable", pending, "queued", queued, "stales", stales)
+				log.Trace("Transaction pool status report", "executable", pending, "queued", queued, "stales", stales)
 				prevPending, prevQueued, prevStales = pending, queued, stales
 			}
 

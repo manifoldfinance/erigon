@@ -133,10 +133,10 @@ var ReceiptRepair = Migration{
 				buf.Reset()
 				err := cbor.Marshal(&buf, receipts1)
 				if err != nil {
-					return fmt.Errorf("encode block receipts for block %d: %v", blockNum, err)
+					return fmt.Errorf("encode block receipts for block %d: %w", blockNum, err)
 				}
 				if err = tx.Put(kv.Receipts, key[:], buf.Bytes()); err != nil {
-					return fmt.Errorf("writing receipts for block %d: %v", blockNum, err)
+					return fmt.Errorf("writing receipts for block %d: %w", blockNum, err)
 				}
 				fixedCount++
 			}
@@ -163,7 +163,7 @@ func runBlock(ibs *state.IntraBlockState, txnWriter state.StateWriter, blockWrit
 		ibs.Prepare(tx.Hash(), block.Hash(), i)
 		receipt, _, err := core.ApplyTransaction(chainConfig, getHeader, engine, nil, gp, ibs, txnWriter, header, tx, usedGas, vmConfig, contractHasTEVM)
 		if err != nil {
-			return nil, fmt.Errorf("could not apply tx %d [%x] failed: %v", i, tx.Hash(), err)
+			return nil, fmt.Errorf("could not apply tx %d [%x] failed: %w", i, tx.Hash(), err)
 		}
 		receipts = append(receipts, receipt)
 	}
@@ -175,11 +175,12 @@ func runBlock(ibs *state.IntraBlockState, txnWriter state.StateWriter, blockWrit
 			userTxs = append(userTxs, &tx)
 		}
 
-		if _, _, err := engine.FinalizeAndAssemble(chainConfig, header, ibs, userTxs, block.Uncles(), receipts, nil, nil, nil, nil); err != nil {			return nil, fmt.Errorf("finalize of block %d failed: %v", block.NumberU64(), err)
+		if _, _, err := engine.FinalizeAndAssemble(chainConfig, header, ibs, userTxs, block.Uncles(), receipts, nil, nil, nil, nil); err != nil {
+			return nil, fmt.Errorf("finalize of block %d failed: %v", block.NumberU64(), err)
 		}
 
 		if err := ibs.CommitBlock(chainConfig.Rules(header.Number.Uint64()), blockWriter); err != nil {
-			return nil, fmt.Errorf("committing block %d failed: %v", block.NumberU64(), err)
+			return nil, fmt.Errorf("committing block %d failed: %w", block.NumberU64(), err)
 		}
 	}
 

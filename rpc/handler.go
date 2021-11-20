@@ -26,8 +26,6 @@ import (
     "sync"
     "time"
 
-    "github.com/ledgerwatch/erigon/common/gopool"
-
     jsoniter "github.com/json-iterator/go"
     "github.com/ledgerwatch/log/v3"
 )
@@ -103,7 +101,7 @@ func newHandler(connCtx context.Context, conn jsonWriter, idgen func() ID, reg *
 }
 
 // handleBatch executes all messages in a batch and returns the responses.
-func (h *handler) handleBatch(ctx context.Context, msgs []*jsonrpcMessage, stream *jsoniter.Stream) {
+func (h *handler) handleBatch(msgs []*jsonrpcMessage) {
     // Emit error response for empty batches:
     if len(msgs) == 0 {
         h.startCallProc(func(cp *callProc) {
@@ -147,7 +145,7 @@ func (h *handler) handleBatch(ctx context.Context, msgs []*jsonrpcMessage, strea
 
                 buf := bytes.NewBuffer(nil)
                 stream := jsoniter.NewStream(jsoniter.ConfigDefault, buf, 4096)
-                if res := h.handleCallMsg(cp, ctx, calls[i], stream); res != nil {
+                if res := h.handleCallMsg(cp, calls[i], stream); res != nil {
                     answersWithNils[i] = res
                 }
                 _ = stream.Flush()
@@ -172,27 +170,21 @@ func (h *handler) handleBatch(ctx context.Context, msgs []*jsonrpcMessage, strea
         }
     })
 }
+
 // handleMsg handles a single message.
-func (h *handler) handleMsg(ctx context.Context, msg *jsonrpcMessage, stream *jsoniter.Stream) {
+func (h *handler) handleMsg(msg *jsonrpcMessage) {
     if ok := h.handleImmediate(msg); ok {
         return
     }
     h.startCallProc(func(cp *callProc) {
-        needWriteStream := false
-        if stream == nil {
-            stream = jsoniter.NewStream(jsoniter.ConfigDefault, nil, 4096)
-            needWriteStream = true
-        }
-        answer := h.handleCallMsg(cp, ctx, msg, stream)
+        stream := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 4096)
+        answer := h.handleCallMsg(cp, msg, stream)
         h.addSubscriptions(cp.notifiers)
         if answer != nil {
-            buffer, _ := json.Marshal(answer)
-            stream.Write(json.RawMessage(buffer))
-        }
-        if needWriteStream {
-            h.conn.writeJSON(cp.ctx, json.RawMessage(stream.Buffer()))
+            h.conn.writeJSON(cp.ctx, answer)
         } else {
-            stream.Write([]byte("\n"))
+            _ = stream.Flush()
+            h.conn.writeJSON(cp.ctx, json.RawMessage(stream.Buffer()))
         }
         for _, n := range cp.notifiers {
             n.activate()
@@ -272,12 +264,12 @@ func (h *handler) cancelServerSubscriptions(err error) {
 // startCallProc runs fn in a new goroutine and starts tracking it in the h.calls wait group.
 func (h *handler) startCallProc(fn func(*callProc)) {
     h.callWG.Add(1)
-    gopool.Submit(func() {
+    go func() {
         ctx, cancel := context.WithCancel(h.rootCtx)
         defer h.callWG.Done()
         defer cancel()
         fn(&callProc{ctx: ctx})
-    })
+    }()
 }
 
 // handleImmediate executes non-call messages. It returns false if the message is a
@@ -304,7 +296,7 @@ func (h *handler) handleImmediate(msg *jsonrpcMessage) bool {
 func (h *handler) handleSubscriptionResult(msg *jsonrpcMessage) {
     var result subscriptionResult
     if err := json.Unmarshal(msg.Params, &result); err != nil {
-        h.log.Debug("Dropping invalid subscription message")
+        h.log.Trace("Dropping invalid subscription message")
         return
     }
     if h.clientSubs[result.ID] != nil {
@@ -316,7 +308,7 @@ func (h *handler) handleSubscriptionResult(msg *jsonrpcMessage) {
 func (h *handler) handleResponse(msg *jsonrpcMessage) {
     op := h.respWait[string(msg.ID)]
     if op == nil {
-        h.log.Debug("Unsolicited RPC response", "reqid", idForLog{msg.ID})
+        h.log.Trace("Unsolicited RPC response", "reqid", idForLog{msg.ID})
         return
     }
     delete(h.respWait, string(msg.ID))
@@ -340,18 +332,16 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 }
 
 // handleCallMsg executes a call message and returns the answer.
-func (h *handler) handleCallMsg(ctx *callProc, reqCtx context.Context, msg *jsonrpcMessage, stream *jsoniter.Stream) *jsonrpcMessage {
+func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage, stream *jsoniter.Stream) *jsonrpcMessage {
     start := time.Now()
     switch {
     case msg.isNotification():
         h.handleCall(ctx, msg, stream)
-        h.log.Debug("Served", "t", time.Since(start), "method", msg.Method, "params", string(msg.Params))
+        h.log.Trace("Served", "t", time.Since(start), "method", msg.Method, "params", string(msg.Params))
         return nil
     case msg.isCall():
         resp := h.handleCall(ctx, msg, stream)
         if resp != nil && resp.Error != nil {
-            xForward := reqCtx.Value("X-Forwarded-For")
-            h.log.Warn("Served "+msg.Method, "reqid", idForLog{msg.ID}, "t", time.Since(start), "err", resp.Error.Message, "X-Forwarded-For", xForward)
             if resp.Error.Data != nil {
                 h.log.Warn("Served", "method", msg.Method, "reqid", idForLog{msg.ID}, "t", time.Since(start),
                     "err", resp.Error.Message, "errdata", resp.Error.Data)
@@ -360,7 +350,7 @@ func (h *handler) handleCallMsg(ctx *callProc, reqCtx context.Context, msg *json
                     "err", resp.Error.Message)
             }
         }
-        h.log.Debug("Served", "t", time.Since(start), "method", msg.Method, "reqid", idForLog{msg.ID}, "params", string(msg.Params))
+        h.log.Trace("Served", "t", time.Since(start), "method", msg.Method, "reqid", idForLog{msg.ID}, "params", string(msg.Params))
         return resp
     case msg.hasValidID():
         return msg.errorResponse(&invalidRequestError{"invalid request"})
@@ -405,7 +395,7 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage, stream *jsoniter
         if answer != nil && answer.Error != nil {
             failedReqeustGauge.Inc()
         }
-        newRPCServingTimerMS(msg.Method, answer == nil || answer.Error == nil).Update(float64(time.Since(start).Milliseconds()))
+        newRPCServingTimerMS(msg.Method, answer == nil || answer.Error == nil).UpdateDuration(start)
     }
     return answer
 }

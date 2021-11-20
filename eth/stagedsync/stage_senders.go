@@ -10,6 +10,7 @@ import (
 	"time"
 
 	libcommon "github.com/ledgerwatch/erigon-lib/common"
+	"github.com/ledgerwatch/erigon-lib/common/length"
 	"github.com/ledgerwatch/erigon-lib/etl"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
@@ -115,7 +116,7 @@ func SpawnRecoverSendersStage(cfg SendersCfg, s *StageState, u Unwinder, tx kv.R
 			log.Info(fmt.Sprintf("[%s] Preload headers", logPrefix), "block_number", binary.BigEndian.Uint64(k))
 		}
 	}
-	log.Debug(fmt.Sprintf("[%s] Read canonical hashes", logPrefix), "amount", len(canonical))
+	log.Trace(fmt.Sprintf("[%s] Read canonical hashes", logPrefix), "amount", len(canonical))
 
 	jobs := make(chan *senderRecoveryJob, cfg.batchSize)
 	out := make(chan *senderRecoveryJob, cfg.batchSize)
@@ -132,8 +133,8 @@ func SpawnRecoverSendersStage(cfg SendersCfg, s *StageState, u Unwinder, tx kv.R
 		}(i)
 	}
 
-	collectorSenders := etl.NewCollector(cfg.tmpdir, etl.NewSortableBuffer(etl.BufferOptimalSize))
-	defer collectorSenders.Close(logPrefix)
+	collectorSenders := etl.NewCollector(logPrefix, cfg.tmpdir, etl.NewSortableBuffer(etl.BufferOptimalSize))
+	defer collectorSenders.Close()
 
 	errCh := make(chan senderRecoveryError)
 	go func() {
@@ -241,16 +242,12 @@ Loop:
 			u.UnwindTo(minBlockNum-1, minBlockHash)
 		}
 	} else {
-		if err := collectorSenders.Load(logPrefix, tx,
-			kv.Senders,
-			etl.IdentityLoadFunc,
-			etl.TransformArgs{
-				Quit: quitCh,
-				LogDetailsLoad: func(k, v []byte) (additionalLogArguments []interface{}) {
-					return []interface{}{"block", binary.BigEndian.Uint64(k)}
-				},
+		if err := collectorSenders.Load(tx, kv.Senders, etl.IdentityLoadFunc, etl.TransformArgs{
+			Quit: quitCh,
+			LogDetailsLoad: func(k, v []byte) (additionalLogArguments []interface{}) {
+				return []interface{}{"block", binary.BigEndian.Uint64(k)}
 			},
-		); err != nil {
+		}); err != nil {
 			return err
 		}
 		if err = s.Update(tx, to); err != nil {
@@ -302,14 +299,14 @@ func recoverSenders(ctx context.Context, logPrefix string, cryptoContext *secp25
 
 		body := job.body
 		signer := types.MakeSigner(config, job.blockNumber)
-		job.senders = make([]byte, len(body.Transactions)*common.AddressLength)
+		job.senders = make([]byte, len(body.Transactions)*length.Addr)
 		for i, tx := range body.Transactions {
 			from, err := signer.SenderWithContext(cryptoContext, tx)
 			if err != nil {
 				job.err = fmt.Errorf("%s: error recovering sender for tx=%x, %w", logPrefix, tx.Hash(), err)
 				break
 			}
-			copy(job.senders[i*common.AddressLength:], from[:])
+			copy(job.senders[i*length.Addr:], from[:])
 		}
 
 		// prevent sending to close channel

@@ -125,9 +125,8 @@ func (b *SimulatedBackend) DB() kv.RwDB {
 }
 
 // Close terminates the underlying blockchain's update loop.
-func (b *SimulatedBackend) Close() error {
-	b.m.DB.Close()
-	return nil
+func (b *SimulatedBackend) Close() {
+	b.m.Close()
 }
 
 // Commit imports all the pending transactions as a single block and starts a
@@ -673,7 +672,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx types.Transac
 	signer := types.MakeSigner(b.m.ChainConfig, b.pendingBlock.NumberU64())
 	sender, senderErr := tx.Sender(*signer)
 	if senderErr != nil {
-		return fmt.Errorf("invalid transaction: %v", senderErr)
+		return fmt.Errorf("invalid transaction: %w", senderErr)
 	}
 	nonce := b.pendingState.GetNonce(sender)
 	if tx.GetNonce() != nonce {
@@ -868,7 +867,15 @@ func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash) (typ
 		return nil, err
 	}
 	defer tx.Rollback()
-	b, senders, err := rawdb.ReadBlockByHashWithSenders(tx, hash)
+	number := rawdb.ReadHeaderNumber(tx, hash)
+	if number == nil {
+		return nil, err
+	}
+	canonicalHash, err := rawdb.ReadCanonicalHash(tx, *number)
+	if err != nil {
+		return nil, fmt.Errorf("requested non-canonical hash %x. canonical=%x", hash, canonicalHash)
+	}
+	b, senders, err := rawdb.ReadBlockWithSenders(tx, hash, *number)
 	if err != nil {
 		return nil, err
 	}
@@ -881,7 +888,15 @@ func (fb *filterBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*ty
 		return nil, err
 	}
 	defer tx.Rollback()
-	b, senders, err := rawdb.ReadBlockByHashWithSenders(tx, hash)
+	number := rawdb.ReadHeaderNumber(tx, hash)
+	if number == nil {
+		return nil, err
+	}
+	canonicalHash, err := rawdb.ReadCanonicalHash(tx, *number)
+	if err != nil {
+		return nil, fmt.Errorf("requested non-canonical hash %x. canonical=%x", hash, canonicalHash)
+	}
+	b, senders, err := rawdb.ReadBlockWithSenders(tx, hash, *number)
 	if err != nil {
 		return nil, err
 	}

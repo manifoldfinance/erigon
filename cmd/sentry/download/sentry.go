@@ -17,17 +17,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/ledgerwatch/erigon-lib/gointerfaces/grpcutil"
-	"github.com/ledgerwatch/log/v3"
-	"google.golang.org/protobuf/types/known/emptypb"
-
-	//grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/holiman/uint256"
 	libcommon "github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon-lib/gointerfaces"
+	"github.com/ledgerwatch/erigon-lib/gointerfaces/grpcutil"
 	proto_sentry "github.com/ledgerwatch/erigon-lib/gointerfaces/sentry"
 	proto_types "github.com/ledgerwatch/erigon-lib/gointerfaces/types"
+	"github.com/ledgerwatch/erigon/cmd/utils"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/debug"
 	"github.com/ledgerwatch/erigon/core/forkid"
@@ -37,7 +32,9 @@ import (
 	"github.com/ledgerwatch/erigon/p2p/enode"
 	"github.com/ledgerwatch/erigon/params"
 	"github.com/ledgerwatch/erigon/rlp"
+	"github.com/ledgerwatch/log/v3"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -124,18 +121,10 @@ func makeP2PServer(
 		urls = params.SokolBootnodes
 	case params.KovanGenesisHash:
 		urls = params.KovanBootnodes
+	case params.FermionGenesisHash:
+		urls = params.FermionBootnodes
 	}
-	p2pConfig.BootstrapNodes = make([]*enode.Node, 0, len(urls))
-	for _, url := range urls {
-		if url != "" {
-			node, err := enode.Parse(enode.ValidSchemes, url)
-			if err != nil {
-				log.Crit("Bootstrap URL invalid", "enode", url, "err", err)
-				continue
-			}
-			p2pConfig.BootstrapNodes = append(p2pConfig.BootstrapNodes, node)
-		}
-	}
+	p2pConfig.BootstrapNodes, _ = utils.GetUrlListNodes(urls, utils.BootnodesFlag.Name, log.Crit)
 	p2pConfig.BootstrapNodesV5 = p2pConfig.BootstrapNodes
 	p2pConfig.Protocols = []p2p.Protocol{protocol}
 	return &p2p.Server{Config: p2pConfig}, nil
@@ -214,13 +203,7 @@ func handShake(
 			return fmt.Errorf("%w", err1)
 		}
 
-		td, overflow := uint256.FromBig(reply.TD)
-		if overflow {
-			return fmt.Errorf("reply.TD higher than 2^256-1")
-		}
-
-		startSyncWithThisPeer := td.Cmp(ourTD) > 0 && startSync != nil
-		if startSyncWithThisPeer {
+		if startSync != nil {
 			if err := startSync(reply.Head); err != nil {
 				return err
 			}
@@ -268,13 +251,13 @@ func runPeer(
 		default:
 		}
 		if peerPrinted {
-			log.Debug("Peer disconnected", "id", peerID, "name", peerInfo.peer.Fullname())
+			log.Trace("Peer disconnected", "id", peerID, "name", peerInfo.peer.Fullname())
 		}
 	}()
 	for {
 		if !peerPrinted {
 			if time.Now().After(printTime) {
-				log.Debug("Peer stable", "id", peerID, "name", peerInfo.peer.Fullname())
+				log.Trace("Peer stable", "id", peerID, "name", peerInfo.peer.Fullname())
 				peerPrinted = true
 			}
 		}
@@ -430,10 +413,10 @@ func rootContext() context.Context {
 
 func grpcSentryServer(ctx context.Context, sentryAddr string, ss *SentryServerImpl) (*grpc.Server, error) {
 	// STARTING GRPC SERVER
-	log.Info("Starting Sentry P2P server", "on", sentryAddr)
+	log.Info("Starting Sentry gRPC server", "on", sentryAddr)
 	listenConfig := net.ListenConfig{
 		Control: func(network, address string, _ syscall.RawConn) error {
-			log.Info("Sentry P2P received connection", "via", network, "from", address)
+			log.Info("Sentry gRPC received connection", "via", network, "from", address)
 			return nil
 		},
 	}
@@ -445,7 +428,7 @@ func grpcSentryServer(ctx context.Context, sentryAddr string, ss *SentryServerIm
 	proto_sentry.RegisterSentryServer(grpcServer, ss)
 	go func() {
 		if err1 := grpcServer.Serve(lis); err1 != nil {
-			log.Error("Sentry P2P server fail", "err", err1)
+			log.Error("Sentry gRPC server fail", "err", err1)
 		}
 	}()
 	return grpcServer, nil
@@ -458,7 +441,7 @@ func NewSentryServer(ctx context.Context, dialCandidates enode.Iterator, readNod
 		peersStreams: NewPeersStreams(),
 	}
 
-	if protocol != eth.ETH65 && protocol != eth.ETH66 {
+	if protocol != eth.ETH66 {
 		panic(fmt.Errorf("unexpected p2p protocol: %d", protocol))
 	}
 
@@ -469,11 +452,11 @@ func NewSentryServer(ctx context.Context, dialCandidates enode.Iterator, readNod
 		DialCandidates: dialCandidates,
 		Run: func(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 			peerID := peer.ID().String()
-			if _, ok := ss.GoodPeers.Load(peerID); ok {
-				log.Debug(fmt.Sprintf("[%s] Peer already has connection", peerID))
+			if ss.getPeer(peerID) != nil {
+				log.Trace(fmt.Sprintf("[%s] Peer already has connection", peerID))
 				return nil
 			}
-			log.Debug(fmt.Sprintf("[%s] Start with peer", peerID))
+			log.Trace(fmt.Sprintf("[%s] Start with peer", peerID))
 
 			peerInfo := &PeerInfo{
 				peer: peer,
@@ -489,7 +472,7 @@ func NewSentryServer(ctx context.Context, dialCandidates enode.Iterator, readNod
 			if err != nil {
 				return fmt.Errorf("handshake to peer %s: %w", peerID, err)
 			}
-			log.Debug(fmt.Sprintf("[%s] Received status message OK", peerID), "name", peer.Name())
+			log.Trace(fmt.Sprintf("[%s] Received status message OK", peerID), "name", peer.Name())
 
 			if err := runPeer(
 				ctx,
@@ -500,7 +483,7 @@ func NewSentryServer(ctx context.Context, dialCandidates enode.Iterator, readNod
 				ss.send,
 				ss.hasSubscribers,
 			); err != nil {
-				log.Debug(fmt.Sprintf("[%s] Error while running peer: %v", peerID, err))
+				log.Trace(fmt.Sprintf("[%s] Error while running peer: %v", peerID, err))
 			}
 			return nil
 		},
@@ -508,11 +491,11 @@ func NewSentryServer(ctx context.Context, dialCandidates enode.Iterator, readNod
 			return readNodeInfo()
 		},
 		PeerInfo: func(id enode.ID) interface{} {
-			p, ok := ss.GoodPeers.Load(id.String())
-			if !ok {
-				return nil
+			peerID := id.String()
+			if peerInfo := ss.getPeer(peerID); peerInfo != nil {
+				return peerInfo.peer.Info()
 			}
-			return p.(*PeerInfo).peer.Info()
+			return nil
 		},
 		//Attributes: []enr.Entry{eth.CurrentENREntry(chainConfig, genesisHash, headHeight)},
 	}
@@ -557,29 +540,48 @@ type SentryServerImpl struct {
 	p2p                  *p2p.Config
 }
 
+func (ss *SentryServerImpl) rangePeers(f func(peerID string, peerInfo *PeerInfo) bool) {
+	ss.GoodPeers.Range(func(key, value interface{}) bool {
+		peerInfo, _ := value.(*PeerInfo)
+		if peerInfo == nil {
+			return true
+		}
+		peerID := key.(string)
+		return f(peerID, peerInfo)
+	})
+}
+
+func (ss *SentryServerImpl) getPeer(peerID string) (peerInfo *PeerInfo) {
+	if value, ok := ss.GoodPeers.Load(peerID); ok {
+		peerInfo := value.(*PeerInfo)
+		if peerInfo != nil {
+			return peerInfo
+		}
+		ss.GoodPeers.Delete(peerID)
+	}
+	return nil
+}
+
+func (ss *SentryServerImpl) removePeer(peerID string) {
+	if value, ok := ss.GoodPeers.LoadAndDelete(peerID); ok {
+		peerInfo := value.(*PeerInfo)
+		if peerInfo != nil {
+			peerInfo.Remove()
+		}
+	}
+}
+
+func (ss *SentryServerImpl) writePeer(peerID string, peerInfo *PeerInfo, msgcode uint64, data []byte) error {
+	err := peerInfo.rw.WriteMsg(p2p.Msg{Code: msgcode, Size: uint32(len(data)), Payload: bytes.NewReader(data)})
+	if err != nil {
+		peerInfo.Remove()
+		ss.GoodPeers.Delete(peerID)
+	}
+	return err
+}
+
 func (ss *SentryServerImpl) startSync(ctx context.Context, bestHash common.Hash, peerID string) error {
 	switch ss.Protocol.Version {
-	case eth.ETH65:
-		b, err := rlp.EncodeToBytes(&eth.GetBlockHeadersPacket{
-			Amount:  1,
-			Reverse: false,
-			Skip:    0,
-			Origin:  eth.HashOrNumber{Hash: bestHash},
-		})
-		if err != nil {
-			return fmt.Errorf("startSync encode packet failed: %w", err)
-		}
-
-		if _, err := ss.SendMessageById(ctx, &proto_sentry.SendMessageByIdRequest{
-			PeerId: gointerfaces.ConvertBytesToH512([]byte(peerID)),
-			Data: &proto_sentry.OutboundMessageData{
-				Id:   proto_sentry.MessageId_GET_BLOCK_HEADERS_65,
-				Data: b,
-			},
-		}); err != nil {
-			return err
-		}
-
 	case eth.ETH66:
 		b, err := rlp.EncodeToBytes(&eth.GetBlockHeadersPacket66{
 			RequestId: rand.Uint64(),
@@ -606,30 +608,21 @@ func (ss *SentryServerImpl) startSync(ctx context.Context, bestHash common.Hash,
 	return nil
 }
 
-func (ss *SentryServerImpl) PenalizePeer(_ context.Context, req *proto_sentry.PenalizePeerRequest) (*empty.Empty, error) {
+func (ss *SentryServerImpl) PenalizePeer(_ context.Context, req *proto_sentry.PenalizePeerRequest) (*emptypb.Empty, error) {
 	//log.Warn("Received penalty", "kind", req.GetPenalty().Descriptor().FullName, "from", fmt.Sprintf("%s", req.GetPeerId()))
-	strId := string(gointerfaces.ConvertH512ToBytes(req.PeerId))
-	if x, ok := ss.GoodPeers.Load(strId); ok {
-		peerInfo := x.(*PeerInfo)
-		if peerInfo != nil {
-			peerInfo.Remove()
-		}
-	}
-	ss.GoodPeers.Delete(strId)
-	return &empty.Empty{}, nil
+	peerID := string(gointerfaces.ConvertH512ToBytes(req.PeerId))
+	ss.removePeer(peerID)
+	return &emptypb.Empty{}, nil
 }
 
-func (ss *SentryServerImpl) PeerMinBlock(_ context.Context, req *proto_sentry.PeerMinBlockRequest) (*empty.Empty, error) {
+func (ss *SentryServerImpl) PeerMinBlock(_ context.Context, req *proto_sentry.PeerMinBlockRequest) (*emptypb.Empty, error) {
 	peerID := string(gointerfaces.ConvertH512ToBytes(req.PeerId))
-	x, _ := ss.GoodPeers.Load(peerID)
-	peerInfo, _ := x.(*PeerInfo)
-	if peerInfo == nil {
-		return &empty.Empty{}, nil
+	if peerInfo := ss.getPeer(peerID); peerInfo != nil {
+		if req.MinBlock > peerInfo.Height() {
+			peerInfo.SetHeight(req.MinBlock)
+		}
 	}
-	if req.MinBlock > peerInfo.Height() {
-		peerInfo.SetHeight(req.MinBlock)
-	}
-	return &empty.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (ss *SentryServerImpl) findPeer(minBlock uint64) (string, *PeerInfo, bool) {
@@ -638,13 +631,7 @@ func (ss *SentryServerImpl) findPeer(minBlock uint64) (string, *PeerInfo, bool) 
 	var foundPeerInfo *PeerInfo
 	var maxPermits int
 	now := time.Now()
-	ss.GoodPeers.Range(func(key, value interface{}) bool {
-		peerID := key.(string)
-		x, _ := ss.GoodPeers.Load(peerID)
-		peerInfo, _ := x.(*PeerInfo)
-		if peerInfo == nil {
-			return true
-		}
+	ss.rangePeers(func(peerID string, peerInfo *PeerInfo) bool {
 		if peerInfo.Height() >= minBlock {
 			deadlines := peerInfo.ClearDeadlines(now, false /* givePermit */)
 			//fmt.Printf("%d deadlines for peer %s\n", deadlines, peerID)
@@ -673,14 +660,7 @@ func (ss *SentryServerImpl) SendMessageByMinBlock(_ context.Context, inreq *prot
 		msgcode != eth.GetPooledTransactionsMsg {
 		return &proto_sentry.SentPeers{}, fmt.Errorf("sendMessageByMinBlock not implemented for message Id: %s", inreq.Data.Id)
 	}
-	if err := peerInfo.rw.WriteMsg(p2p.Msg{Code: msgcode, Size: uint32(len(inreq.Data.Data)), Payload: bytes.NewReader(inreq.Data.Data)}); err != nil {
-		if x, ok := ss.GoodPeers.Load(peerID); ok {
-			peerInfo := x.(*PeerInfo)
-			if peerInfo != nil {
-				peerInfo.Remove()
-			}
-		}
-		ss.GoodPeers.Delete(peerID)
+	if err := ss.writePeer(peerID, peerInfo, msgcode, inreq.Data.Data); err != nil {
 		return &proto_sentry.SentPeers{}, fmt.Errorf("sendMessageByMinBlock to peer %s: %w", peerID, err)
 	}
 	peerInfo.AddDeadline(time.Now().Add(30 * time.Second))
@@ -689,13 +669,12 @@ func (ss *SentryServerImpl) SendMessageByMinBlock(_ context.Context, inreq *prot
 
 func (ss *SentryServerImpl) SendMessageById(_ context.Context, inreq *proto_sentry.SendMessageByIdRequest) (*proto_sentry.SentPeers, error) {
 	peerID := string(gointerfaces.ConvertH512ToBytes(inreq.PeerId))
-	x, ok := ss.GoodPeers.Load(peerID)
-	if !ok {
+	peerInfo := ss.getPeer(peerID)
+	if peerInfo == nil {
 		//TODO: enable after support peer to sentry mapping
 		//return &proto_sentry.SentPeers{}, fmt.Errorf("peer not found: %s", peerID)
 		return &proto_sentry.SentPeers{}, nil
 	}
-	peerInfo := x.(*PeerInfo)
 	msgcode := eth.FromProto[ss.Protocol.Version][inreq.Data.Id]
 	if msgcode != eth.GetBlockHeadersMsg &&
 		msgcode != eth.BlockHeadersMsg &&
@@ -708,14 +687,7 @@ func (ss *SentryServerImpl) SendMessageById(_ context.Context, inreq *proto_sent
 		return &proto_sentry.SentPeers{}, fmt.Errorf("sendMessageById not implemented for message Id: %s", inreq.Data.Id)
 	}
 
-	if err := peerInfo.rw.WriteMsg(p2p.Msg{Code: msgcode, Size: uint32(len(inreq.Data.Data)), Payload: bytes.NewReader(inreq.Data.Data)}); err != nil {
-		if x, ok := ss.GoodPeers.Load(peerID); ok {
-			peerInfo := x.(*PeerInfo)
-			if peerInfo != nil {
-				peerInfo.Remove()
-			}
-		}
-		ss.GoodPeers.Delete(peerID)
+	if err := ss.writePeer(peerID, peerInfo, msgcode, inreq.Data.Data); err != nil {
 		return &proto_sentry.SentPeers{}, fmt.Errorf("sendMessageById to peer %s: %w", peerID, err)
 	}
 	return &proto_sentry.SentPeers{Peers: []*proto_types.H512{inreq.PeerId}}, nil
@@ -730,7 +702,7 @@ func (ss *SentryServerImpl) SendMessageToRandomPeers(ctx context.Context, req *p
 	}
 
 	amount := uint64(0)
-	ss.GoodPeers.Range(func(key, value interface{}) bool {
+	ss.rangePeers(func(peerID string, peerInfo *PeerInfo) bool {
 		amount++
 		return true
 	})
@@ -743,15 +715,8 @@ func (ss *SentryServerImpl) SendMessageToRandomPeers(ctx context.Context, req *p
 	i := 0
 	var innerErr error
 	reply := &proto_sentry.SentPeers{Peers: []*proto_types.H512{}}
-	ss.GoodPeers.Range(func(key, value interface{}) bool {
-		peerID := key.(string)
-		peerInfo, _ := value.(*PeerInfo)
-		if peerInfo == nil {
-			return true
-		}
-		if err := peerInfo.rw.WriteMsg(p2p.Msg{Code: msgcode, Size: uint32(len(req.Data.Data)), Payload: bytes.NewReader(req.Data.Data)}); err != nil {
-			peerInfo.Remove()
-			ss.GoodPeers.Delete(peerID)
+	ss.rangePeers(func(peerID string, peerInfo *PeerInfo) bool {
+		if err := ss.writePeer(peerID, peerInfo, msgcode, req.Data.Data); err != nil {
 			innerErr = err
 			return true
 		}
@@ -775,15 +740,8 @@ func (ss *SentryServerImpl) SendMessageToAll(ctx context.Context, req *proto_sen
 
 	var innerErr error
 	reply := &proto_sentry.SentPeers{Peers: []*proto_types.H512{}}
-	ss.GoodPeers.Range(func(key, value interface{}) bool {
-		peerID := key.(string)
-		peerInfo, _ := value.(*PeerInfo)
-		if peerInfo == nil {
-			return true
-		}
-		if err := peerInfo.rw.WriteMsg(p2p.Msg{Code: msgcode, Size: uint32(len(req.Data)), Payload: bytes.NewReader(req.Data)}); err != nil {
-			peerInfo.Remove()
-			ss.GoodPeers.Delete(peerID)
+	ss.rangePeers(func(peerID string, peerInfo *PeerInfo) bool {
+		if err := ss.writePeer(peerID, peerInfo, msgcode, req.Data); err != nil {
 			innerErr = err
 			return true
 		}
@@ -801,8 +759,6 @@ func (ss *SentryServerImpl) HandShake(context.Context, *emptypb.Empty) (*proto_s
 	switch ss.Protocol.Version {
 	case eth.ETH66:
 		reply.Protocol = proto_sentry.Protocol_ETH66
-	case eth.ETH65:
-		reply.Protocol = proto_sentry.Protocol_ETH65
 	}
 	return reply, nil
 }
@@ -845,13 +801,7 @@ func (ss *SentryServerImpl) SetStatus(_ context.Context, statusData *proto_sentr
 }
 
 func (ss *SentryServerImpl) SimplePeerCount() (pc int) {
-	ss.GoodPeers.Range(func(key, value interface{}) bool {
-		peerID := key.(string)
-		x, _ := ss.GoodPeers.Load(peerID)
-		peerInfo, _ := x.(*PeerInfo)
-		if peerInfo == nil {
-			return true
-		}
+	ss.rangePeers(func(peerID string, peerInfo *PeerInfo) bool {
 		pc++
 		return true
 	})
@@ -890,7 +840,7 @@ func (ss *SentryServerImpl) send(msgID proto_sentry.MessageId, peerID string, b 
 		ch := ss.messageStreams[msgID][i]
 		ch <- req
 		if len(ch) > MessagesQueueSize/2 {
-			log.Debug("[sentry] consuming is slow", "msgID", msgID.String())
+			log.Debug("[sentry] consuming is slow, drop 50% of old messages", "msgID", msgID.String())
 			// evict old messages from channel
 			for j := 0; j < MessagesQueueSize/4; j++ {
 				select {
@@ -938,7 +888,7 @@ func (ss *SentryServerImpl) addMessagesStream(ids []proto_sentry.MessageId, ch c
 
 const MessagesQueueSize = 1024 // one such queue per client of .Messages stream
 func (ss *SentryServerImpl) Messages(req *proto_sentry.MessagesRequest, server proto_sentry.Sentry_MessagesServer) error {
-	log.Debug("[Messages] new subscriber", "to", req.Ids)
+	log.Trace("[Messages] new subscriber", "to", req.Ids)
 	ch := make(chan *proto_sentry.InboundMessage, MessagesQueueSize)
 	defer close(ch)
 	clean := ss.addMessagesStream(req.Ids, ch)

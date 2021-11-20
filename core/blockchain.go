@@ -289,7 +289,7 @@ func FinalizeBlockExecution(engine consensus.Engine, stateReader state.StateRead
 	}
 
 	if err := ibs.CommitBlock(cc.Rules(header.Number.Uint64()), stateWriter); err != nil {
-		return fmt.Errorf("committing block %d failed: %v", header.Number.Uint64(), err)
+		return fmt.Errorf("committing block %d failed: %w", header.Number.Uint64(), err)
 	}
 
 	if originalSystemAcc != nil { // hack for Sokol - don't understand why eip158 is enabled, but OE still save SystemAddress with nonce=0
@@ -301,7 +301,7 @@ func FinalizeBlockExecution(engine consensus.Engine, stateReader state.StateRead
 	}
 
 	if err := stateWriter.WriteChangeSets(); err != nil {
-		return fmt.Errorf("writing changesets for block %d failed: %v", header.Number.Uint64(), err)
+		return fmt.Errorf("writing changesets for block %d failed: %w", header.Number.Uint64(), err)
 	}
 	return nil
 }

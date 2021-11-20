@@ -11,7 +11,7 @@ GO_DBG_BUILD = $(GO) build -trimpath -tags=debug -ldflags "-X github.com/ledgerw
 GO_MAJOR_VERSION = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f1)
 GO_MINOR_VERSION = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f2)
 
-all: erigon hack rpctest state pics rpcdaemon integration db-tools sentry
+all: erigon hack rpctest state pics rpcdaemon integration db-tools sentry txpool
 
 go-version:
 	@if [ $(GO_MINOR_VERSION) -lt 16 ]; then \
@@ -69,6 +69,11 @@ rpcdaemon:
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/rpcdaemon\" to launch rpcdaemon."
 
+txpool:
+	$(GOBUILD) -o $(GOBIN)/txpool ./cmd/txpool
+	@echo "Done building."
+	@echo "Run \"$(GOBIN)/txpool\" to launch txpool."
+
 integration:
 	$(GOBUILD) -o $(GOBIN)/integration ./cmd/integration
 	@echo "Done building."
@@ -105,9 +110,10 @@ tracker:
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/tracker\" to run snapshots tracker."
 
-db-tools: libmdbx
+db-tools:
 	@echo "Building db-tools"
-	git submodule update --init --recursive
+	rm -rf libmdbx # hub.docker.com setup incorrect gitpath for git modules. Just remove it and re-init submodule.
+	git submodule update --init --recursive --force
 	cd libmdbx && MDBX_BUILD_TIMESTAMP=unknown make tools
 	cp libmdbx/mdbx_chk $(GOBIN)
 	cp libmdbx/mdbx_copy $(GOBIN)
@@ -129,7 +135,7 @@ lintci:
 
 lintci-deps:
 	rm -f ./build/bin/golangci-lint
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./build/bin v1.41.1
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./build/bin v1.42.1
 
 clean:
 	env GO111MODULE=on go clean -cache

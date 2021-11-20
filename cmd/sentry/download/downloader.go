@@ -12,12 +12,12 @@ import (
 
 	"github.com/c2h5oh/datasize"
 	"github.com/holiman/uint256"
+	"github.com/ledgerwatch/erigon-lib/common/dbg"
 	"github.com/ledgerwatch/erigon-lib/direct"
 	"github.com/ledgerwatch/erigon-lib/gointerfaces"
 	proto_sentry "github.com/ledgerwatch/erigon-lib/gointerfaces/sentry"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
-	debug2 "github.com/ledgerwatch/erigon/common/debug"
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/core/forkid"
 	"github.com/ledgerwatch/erigon/core/types"
@@ -90,14 +90,15 @@ func RecvUploadMessage(ctx context.Context,
 	handleInboundMessage func(ctx context.Context, inreq *proto_sentry.InboundMessage, sentry direct.SentryClient) error,
 	wg *sync.WaitGroup,
 ) (err error) {
-	defer func() { err = debug2.ReportPanicAndRecover(err) }() // avoid crash because Erigon's core does many things
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("%+v, trace: %s", rec, dbg.Stack())
+		}
+	}() // avoid crash because Erigon's core does many things
 	streamCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	stream, err := sentry.Messages(streamCtx, &proto_sentry.MessagesRequest{Ids: []proto_sentry.MessageId{
-		eth.ToProto[eth.ETH65][eth.GetBlockBodiesMsg],
-		eth.ToProto[eth.ETH65][eth.GetReceiptsMsg],
-
 		eth.ToProto[eth.ETH66][eth.GetBlockBodiesMsg],
 		eth.ToProto[eth.ETH66][eth.GetReceiptsMsg],
 	}}, grpc.WaitForReady(true))
@@ -181,13 +182,15 @@ func RecvUploadHeadersMessage(ctx context.Context,
 	handleInboundMessage func(ctx context.Context, inreq *proto_sentry.InboundMessage, sentry direct.SentryClient) error,
 	wg *sync.WaitGroup,
 ) (err error) {
-	defer func() { err = debug2.ReportPanicAndRecover(err) }() // avoid crash because Erigon's core does many things
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("%+v, trace: %s", rec, dbg.Stack())
+		}
+	}() // avoid crash because Erigon's core does many things
 	streamCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	stream, err := sentry.Messages(streamCtx, &proto_sentry.MessagesRequest{Ids: []proto_sentry.MessageId{
-		eth.ToProto[eth.ETH65][eth.GetBlockHeadersMsg],
-
 		eth.ToProto[eth.ETH66][eth.GetBlockHeadersMsg],
 	}}, grpc.WaitForReady(true))
 	if err != nil {
@@ -210,7 +213,7 @@ func RecvUploadHeadersMessage(ctx context.Context,
 			if rlp.IsDecodeError(err) {
 				log.Debug("[RecvUploadHeadersMessage] Handling incoming message", "error", err)
 			} else {
-				log.Error("[RecvUploadHeadersMessage] Handling incoming message", "error", err)
+				log.Warn("[RecvUploadHeadersMessage] Handling incoming message", "error", err)
 			}
 		}
 		if wg != nil {
@@ -274,17 +277,16 @@ func RecvMessage(
 	handleInboundMessage func(ctx context.Context, inreq *proto_sentry.InboundMessage, sentry direct.SentryClient) error,
 	wg *sync.WaitGroup,
 ) (err error) {
-	defer func() { err = debug2.ReportPanicAndRecover(err) }() // avoid crash because Erigon's core does many things
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("%+v, trace: %s", rec, dbg.Stack())
+		}
+	}() // avoid crash because Erigon's core does many things
 	streamCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	defer sentry.MarkDisconnected()
 
 	stream, err := sentry.Messages(streamCtx, &proto_sentry.MessagesRequest{Ids: []proto_sentry.MessageId{
-		eth.ToProto[eth.ETH65][eth.BlockHeadersMsg],
-		eth.ToProto[eth.ETH65][eth.BlockBodiesMsg],
-		eth.ToProto[eth.ETH65][eth.NewBlockHashesMsg],
-		eth.ToProto[eth.ETH65][eth.NewBlockMsg],
-
 		eth.ToProto[eth.ETH66][eth.BlockHeadersMsg],
 		eth.ToProto[eth.ETH66][eth.BlockBodiesMsg],
 		eth.ToProto[eth.ETH66][eth.NewBlockHashesMsg],
@@ -312,7 +314,7 @@ func RecvMessage(
 			if rlp.IsDecodeError(err) {
 				log.Debug("[RecvMessage] Handling incoming message", "error", err)
 			} else {
-				log.Error("[RecvMessage] Handling incoming message", "error", err)
+				log.Warn("[RecvMessage] Handling incoming message", "error", err)
 			}
 		}
 
@@ -519,7 +521,7 @@ func (cs *ControlServerImpl) blockHeaders66(ctx context.Context, in *proto_sentr
 				if req != nil {
 					if peer := cs.SendHeaderRequest(ctx, req); peer != nil {
 						cs.Hd.SentRequest(req, currentTime, 5 /* timeout */)
-						log.Debug("Sent request", "height", req.Number)
+						log.Trace("Sent request", "height", req.Number)
 					}
 				}
 				cs.Penalize(ctx, penalties)
@@ -594,7 +596,7 @@ func (cs *ControlServerImpl) blockHeaders65(ctx context.Context, in *proto_sentr
 				if req != nil {
 					if peer := cs.SendHeaderRequest(ctx, req); peer != nil {
 						cs.Hd.SentRequest(req, currentTime, 5 /* timeout */)
-						log.Debug("Sent request", "height", req.Number)
+						log.Trace("Sent request", "height", req.Number)
 					}
 				}
 				cs.Penalize(ctx, penalties)
@@ -673,7 +675,7 @@ func (cs *ControlServerImpl) newBlock65(ctx context.Context, inreq *proto_sentry
 	if _, err1 := sentry.PeerMinBlock(ctx, &outreq, &grpc.EmptyCallOption{}); err1 != nil {
 		log.Error("Could not send min block for peer", "err", err1)
 	}
-	log.Debug(fmt.Sprintf("NewBlockMsg{blockNumber: %d} from [%s]", request.Block.NumberU64(), gointerfaces.ConvertH512ToBytes(inreq.PeerId)))
+	log.Trace(fmt.Sprintf("NewBlockMsg{blockNumber: %d} from [%s]", request.Block.NumberU64(), gointerfaces.ConvertH512ToBytes(inreq.PeerId)))
 	return nil
 }
 

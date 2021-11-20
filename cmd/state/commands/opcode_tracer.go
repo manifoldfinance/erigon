@@ -681,7 +681,7 @@ func runBlock(ibs *state.IntraBlockState, txnWriter state.StateWriter, blockWrit
 		ibs.Prepare(tx.Hash(), block.Hash(), i)
 		receipt, _, err := core.ApplyTransaction(chainConfig, getHeader, engine, nil, gp, ibs, txnWriter, header, tx, usedGas, vmConfig, contractHasTEVM)
 		if err != nil {
-			return nil, fmt.Errorf("could not apply tx %d [%x] failed: %v", i, tx.Hash(), err)
+			return nil, fmt.Errorf("could not apply tx %d [%x] failed: %w", i, tx.Hash(), err)
 		}
 		receipts = append(receipts, receipt)
 	}
@@ -693,7 +693,7 @@ func runBlock(ibs *state.IntraBlockState, txnWriter state.StateWriter, blockWrit
 		}
 
 		if err := ibs.CommitBlock(rules, blockWriter); err != nil {
-			return nil, fmt.Errorf("committing block %d failed: %v", block.NumberU64(), err)
+			return nil, fmt.Errorf("committing block %d failed: %w", block.NumberU64(), err)
 		}
 	}
 

@@ -227,7 +227,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		return nil, gas, ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
-	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.IntraBlockState, caller.Address(), value) {
+	if !value.IsZero() && !evm.Context.CanTransfer(evm.IntraBlockState, caller.Address(), value) {
 		if !bailout {
 			return nil, gas, ErrInsufficientBalance
 		}
@@ -250,7 +250,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		snapshot = evm.IntraBlockState.Snapshot()
 	)
 	if !evm.IntraBlockState.Exist(addr) {
-		if !isPrecompile && evm.ChainRules.IsEIP158 && value.Sign() == 0 {
+		if !isPrecompile && evm.ChainRules.IsEIP158 && value.IsZero() {
 			return nil, gas, nil
 		}
 		evm.IntraBlockState.CreateAccount(addr, false)
@@ -563,7 +563,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		createDataGas := uint64(len(ret)) * params.CreateDataGas
 		if contract.UseGas(createDataGas) {
 			evm.IntraBlockState.SetCode(address, ret)
-		} else {
+		} else if evm.ChainRules.IsHomestead {
 			err = ErrCodeStoreOutOfGas
 		}
 	}

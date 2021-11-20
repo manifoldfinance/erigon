@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	jsoniter "github.com/json-iterator/go"
+	"github.com/ledgerwatch/erigon-lib/kv/kvcache"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/core"
+	"github.com/ledgerwatch/erigon/turbo/snapshotsync"
 	"github.com/ledgerwatch/erigon/turbo/stages"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fastjson"
@@ -44,7 +46,9 @@ func TestCallTraceOneByOne(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate chain: %v", err)
 	}
-	api := NewTraceAPI(NewBaseApi(nil), m.DB, &cli.Flags{})
+	api := NewTraceAPI(
+		NewBaseApi(nil, kvcache.New(kvcache.DefaultCoherentConfig), snapshotsync.NewBlockReader(), false),
+		m.DB, &cli.Flags{})
 	// Insert blocks 1 by 1, to tirgget possible "off by one" errors
 	for i := 0; i < chain.Length; i++ {
 		if err = m.InsertChain(chain.Slice(i, i+1)); err != nil {
@@ -89,7 +93,7 @@ func TestCallTraceUnwind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate chainB: %v", err)
 	}
-	api := NewTraceAPI(NewBaseApi(nil), m.DB, &cli.Flags{})
+	api := NewTraceAPI(NewBaseApi(nil, kvcache.New(kvcache.DefaultCoherentConfig), snapshotsync.NewBlockReader(), false), m.DB, &cli.Flags{})
 	if err = m.InsertChain(chainA); err != nil {
 		t.Fatalf("inserting chainA: %v", err)
 	}
@@ -149,7 +153,7 @@ func TestFilterNoAddresses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate chain: %v", err)
 	}
-	api := NewTraceAPI(NewBaseApi(nil), m.DB, &cli.Flags{})
+	api := NewTraceAPI(NewBaseApi(nil, kvcache.New(kvcache.DefaultCoherentConfig), snapshotsync.NewBlockReader(), false), m.DB, &cli.Flags{})
 	// Insert blocks 1 by 1, to tirgget possible "off by one" errors
 	for i := 0; i < chain.Length; i++ {
 		if err = m.InsertChain(chain.Slice(i, i+1)); err != nil {

@@ -320,6 +320,8 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.SokolChainConfig
 	case ghash == params.KovanGenesisHash:
 		return params.KovanChainConfig
+	case ghash == params.FermionGenesisHash:
+		return params.FermionChainConfig
 	default:
 		return params.AllEthashProtocolChanges
 	}
@@ -438,13 +440,13 @@ func (g *Genesis) WriteGenesisState(tx kv.RwTx) (*types.Block, *state.IntraBlock
 	blockWriter := state.NewPlainStateWriter(tx, tx, 0)
 
 	if err := statedb.CommitBlock(params.Rules{}, blockWriter); err != nil {
-		return nil, statedb, fmt.Errorf("cannot write state: %v", err)
+		return nil, statedb, fmt.Errorf("cannot write state: %w", err)
 	}
 	if err := blockWriter.WriteChangeSets(); err != nil {
-		return nil, statedb, fmt.Errorf("cannot write change sets: %v", err)
+		return nil, statedb, fmt.Errorf("cannot write change sets: %w", err)
 	}
 	if err := blockWriter.WriteHistory(); err != nil {
-		return nil, statedb, fmt.Errorf("cannot write history: %v", err)
+		return nil, statedb, fmt.Errorf("cannot write history: %w", err)
 	}
 	return block, statedb, nil
 }
@@ -642,6 +644,17 @@ func DefaultBSCMainnetGenesisBlock() *Genesis {
 		Mixhash:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"), // todo
 		Coinbase:   common.HexToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE"), // todo
 		Alloc:      readPrealloc("allocs/bsc-mainnet.json"),
+	}
+}
+
+func DefaultFermionGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.FermionChainConfig,
+		Timestamp:  0x0,
+		ExtraData:  hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000003a03f6d88437328ce8623ef5e80c67383704ebc13ec60da1858ec7fa8edd0dc736611dba9ab4399942d5d120ad9c1692c5fa72dca20657254bbaa08d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   0x5B8D80,
+		Difficulty: big.NewInt(0x20000),
+		Alloc:      readPrealloc("allocs/fermion.json"),
 	}
 }
 

@@ -87,7 +87,7 @@ func startLocalhostV5(t *testing.T, cfg Config) *UDPv5 {
 	// Prefix logs with node ID.
 	lprefix := fmt.Sprintf("(%s)", ln.ID().TerminalString())
 	lfmt := log.TerminalFormat()
-	cfg.Log = testlog.Logger(t, log.LvlInfo)
+	cfg.Log = testlog.Logger(t, log.LvlError)
 	cfg.Log.SetHandler(log.FuncHandler(func(r *log.Record) error {
 		t.Logf("%s %s", lprefix, lfmt.Format(r))
 		return nil
@@ -688,7 +688,7 @@ func (c *testCodec) Decode(input []byte, addr string) (enode.ID, *enode.Node, v5
 
 func (c *testCodec) decodeFrame(input []byte) (frame testCodecFrame, p v5wire.Packet, err error) {
 	if err = rlp.DecodeBytes(input, &frame); err != nil {
-		return frame, nil, fmt.Errorf("invalid frame: %v", err)
+		return frame, nil, fmt.Errorf("invalid frame: %w", err)
 	}
 	switch frame.Ptype {
 	case v5wire.UnknownPacket:
@@ -727,7 +727,7 @@ func newUDPV5Test(t *testing.T) *udpV5Test {
 	ln.Set(enr.UDP(30303))
 	test.udp, err = ListenV5(test.pipe, ln, Config{
 		PrivateKey:   test.localkey,
-		Log:          testlog.Logger(t, log.LvlInfo),
+		Log:          testlog.Logger(t, log.LvlError),
 		ValidSchemes: enode.ValidSchemesForTesting,
 	})
 	if err != nil {
@@ -755,7 +755,7 @@ func (test *udpV5Test) packetInFrom(key *ecdsa.PrivateKey, addr *net.UDPAddr, pa
 	codec := &testCodec{test: test, id: ln.ID()}
 	enc, _, err := codec.Encode(test.udp.Self().ID(), addr.String(), packet, nil)
 	if err != nil {
-		test.t.Errorf("%s encode error: %v", packet.Name(), err)
+		test.t.Errorf("%s encode error: %w", packet.Name(), err)
 	}
 	if test.udp.dispatchReadPacket(addr, enc) {
 		<-test.udp.readNextCh // unblock UDPv5.dispatch
@@ -807,7 +807,7 @@ func (test *udpV5Test) waitPacketOut(validate interface{}) (closed bool) {
 	codec := &testCodec{test: test, id: ln.ID()}
 	frame, p, err := codec.decodeFrame(dgram.data)
 	if err != nil {
-		test.t.Errorf("sent packet decode error: %v", err)
+		test.t.Errorf("sent packet decode error: %w", err)
 		return false
 	}
 	if !reflect.TypeOf(p).AssignableTo(exptype) {

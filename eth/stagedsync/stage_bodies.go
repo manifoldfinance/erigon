@@ -78,6 +78,7 @@ func BodiesForward(
 	if bodyProgress == headerProgress {
 		return nil
 	}
+
 	logPrefix := s.LogPrefix()
 	if headerProgress <= bodyProgress+16 {
 		// When processing small number of blocks, we can afford wasting more bandwidth but get blocks quicker
@@ -88,6 +89,14 @@ func BodiesForward(
 	}
 	logEvery := time.NewTicker(logInterval)
 	defer logEvery.Stop()
+
+	// Property of blockchain: same block in different forks will have different hashes.
+	// Means - can mark all canonical blocks as non-canonical on unwind, and
+	// do opposite here - without storing any meta-info.
+	if err := rawdb.MakeBodiesCanonical(tx, s.BlockNumber+1, ctx, logPrefix, logEvery); err != nil {
+		return fmt.Errorf("make block canonical: %w", err)
+	}
+
 	var prevDeliveredCount float64 = 0
 	var prevWastedCount float64 = 0
 	timer := time.NewTimer(1 * time.Second) // Check periodically even in the abseence of incoming messages
@@ -158,12 +167,15 @@ Loop:
 				u.UnwindTo(blockHeight-1, header.Hash())
 				break Loop
 			}
-			if err = rawdb.WriteRawBody(tx, header.Hash(), blockHeight, rawBody); err != nil {
+
+			// Check existence before write - because WriteRawBody isn't idempotent (it allocates new sequence range for transactions on every call)
+			if err = rawdb.WriteRawBodyIfNotExists(tx, header.Hash(), blockHeight, rawBody); err != nil {
 				return fmt.Errorf("writing block body: %w", err)
 			}
+
 			if blockHeight > bodyProgress {
 				bodyProgress = blockHeight
-				if err = stages.SaveStageProgress(tx, stages.Bodies, blockHeight); err != nil {
+				if err = s.Update(tx, blockHeight); err != nil {
 					return fmt.Errorf("saving Bodies progress: %w", err)
 				}
 			}
@@ -200,7 +212,7 @@ Loop:
 		case <-timer.C:
 			log.Trace("RequestQueueTime (bodies) ticked")
 		case <-cfg.bd.DeliveryNotify:
-			log.Debug("bodyLoop woken up by the incoming request")
+			log.Trace("bodyLoop woken up by the incoming request")
 		}
 		d6 += time.Since(start)
 	}
@@ -242,6 +254,13 @@ func UnwindBodiesStage(u *UnwindState, tx kv.RwTx, cfg BodiesCfg, ctx context.Co
 			return err
 		}
 		defer tx.Rollback()
+	}
+
+	logEvery := time.NewTicker(logInterval)
+	defer logEvery.Stop()
+
+	if err := rawdb.MakeBodiesNonCanonical(tx, u.UnwindPoint+1, ctx, u.LogPrefix(), logEvery); err != nil {
+		return err
 	}
 
 	if err = u.Done(tx); err != nil {
