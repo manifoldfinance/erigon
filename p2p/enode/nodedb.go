@@ -29,9 +29,11 @@ import (
 	"time"
 
 	"github.com/google/btree"
+
 	"github.com/c2h5oh/datasize"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon-lib/kv/mdbx"
+
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/rlp"
 	"github.com/ledgerwatch/log/v3"
@@ -442,11 +444,7 @@ func deleteRange(db *DB, prefix []byte) {
 // convergence, it's simpler to "ensure" the correct state when an appropriate
 // condition occurs (i.e. a successful bonding), and discard further events.
 func (db *DB) ensureExpirer() {
-	db.runner.Do(func() {
-		go func() {
-			db.expirer()
-		}()
-	})
+	db.runner.Do(func() { go db.expirer() })
 }
 
 // expirer should be started in a go routine, and is responsible for looping ad

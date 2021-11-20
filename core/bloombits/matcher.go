@@ -240,7 +240,7 @@ func (m *Matcher) run(begin, end uint64, buffer int, session *MatcherSession) ch
 			case source <- &partialMatches{i, bytes.Repeat([]byte{0xff}, int(m.sectionSize/8))}:
 			}
 		}
-	})
+	}()
 	// Assemble the daisy-chained filtering pipeline
 	next := source
 	dist := make(chan *request, buffer)
@@ -250,9 +250,7 @@ func (m *Matcher) run(begin, end uint64, buffer int, session *MatcherSession) ch
 	}
 	// Start the request distribution
 	session.pend.Add(1)
-	go func() {
-		m.distributor(dist, session)
-	})
+	go m.distributor(dist, session)
 
 	return next
 }
@@ -319,7 +317,7 @@ func (m *Matcher) subMatch(source chan *partialMatches, dist chan *request, bloo
 				}
 			}
 		}
-	})
+	}()
 
 	go func() {
 		defer debug.LogPanic()
@@ -378,7 +376,7 @@ func (m *Matcher) subMatch(source chan *partialMatches, dist chan *request, bloo
 				}
 			}
 		}
-	})
+	}()
 	return results
 }
 

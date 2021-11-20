@@ -155,7 +155,7 @@ func (p *pingPongService) Run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 			atomic.AddInt64(&p.received, 1)
 			if msg.Code == pingMsgCode {
 				log.Info("sending pong")
-				go func() { p2p.Send(rw, pongMsgCode, "PONG") }()
+				go p2p.Send(rw, pongMsgCode, "PONG")
 			}
 		}
 	}()

@@ -122,9 +122,7 @@ func (it *lookup) startQueries() bool {
 		if !it.asked[n.ID()] {
 			it.asked[n.ID()] = true
 			it.queries++
-			go func() {
-				it.query(n, it.replyCh)
-			}()
+			go it.query(n, it.replyCh)
 		}
 	}
 	// The lookup ends when no more nodes can be asked.

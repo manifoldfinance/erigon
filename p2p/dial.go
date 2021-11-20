@@ -185,12 +185,8 @@ func newDialScheduler(config dialConfig, it enode.Iterator, setupFunc dialSetupF
 	d.lastStatsLog = d.clock.Now()
 	d.ctx, d.cancel = context.WithCancel(context.Background())
 	d.wg.Add(2)
-	go func() {
-		d.readNodes(it)
-	}()
-	go func() {
-		d.loop(it)
-	}()
+	go d.readNodes(it)
+	go d.loop(it)
 	return d
 }
 

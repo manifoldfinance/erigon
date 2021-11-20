@@ -504,9 +504,7 @@ func (t *UDPv4) loop() {
 			if contTimeouts > ntpFailureThreshold {
 				if time.Since(ntpWarnTime) >= ntpWarningCooldown {
 					ntpWarnTime = time.Now()
-					go func() {
-						checkClockDrift()
-					}()
+					go checkClockDrift()
 				}
 				contTimeouts = 0
 			}

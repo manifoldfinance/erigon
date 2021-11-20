@@ -1053,9 +1053,7 @@ func (srv *Server) launchPeer(c *conn) *Peer {
 		// to the peer.
 		p.events = &srv.peerFeed
 	}
-	go func() {
-		srv.runPeer(p)
-	}()
+	go srv.runPeer(p)
 	return p
 }
 

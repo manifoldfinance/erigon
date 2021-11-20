@@ -798,15 +798,14 @@ func (f *TxFetcher) scheduleFetches(timer *mclock.Timer, timeout chan struct{}, 
 			f.requests[peer] = &txRequest{hashes: hashes, time: f.clock.Now()}
 			//txRequestOutMeter.Mark(int64(len(hashes)))
 
-			p := peer
-			go func() {
+			go func(peer string, hashes []common.Hash) {
 				// Try to fetch the transactions, but in case of a request
 				// failure (e.g. peer disconnected), reschedule the hashes.
-				if err := f.fetchTxs(p, hashes); err != nil {
+				if err := f.fetchTxs(peer, hashes); err != nil {
 					//txRequestFailMeter.Mark(int64(len(hashes)))
-					f.Drop(p) //nolint:errcheck
+					f.Drop(peer) //nolint:errcheck
 				}
-			}()
+			}(peer, hashes)
 		}
 	})
 	// If a new request was fired, schedule a timeout timer

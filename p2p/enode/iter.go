@@ -179,9 +179,7 @@ func (m *FairMix) AddSource(it Iterator) {
 	m.wg.Add(1)
 	source := &mixSource{it, make(chan *Node), m.timeout}
 	m.sources = append(m.sources, source)
-	go func() {
-		m.runSource(m.closed, source)
-	}()
+	go m.runSource(m.closed, source)
 }
 
 // Close shuts down the mixer and all current sources.
