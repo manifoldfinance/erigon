@@ -32,10 +32,6 @@ import (
 	"github.com/ledgerwatch/log/v3"
 )
 
-const (
-	defaultNumOfSlots = 100
-)
-
 type revision struct {
 	id           int
 	journalIndex int
@@ -56,7 +52,7 @@ type IntraBlockState struct {
 	stateReader StateReader
 
 	// This map holds 'live' objects, which will get modified while processing a state transition.
-	stateObjects      map[common.Address]*StateObject
+	stateObjects      map[common.Address]*stateObject
 	stateObjectsDirty map[common.Address]struct{}
 
 	nilAccounts map[common.Address]struct{} // Remember non-existent account to avoid reading them again
@@ -90,7 +86,7 @@ type IntraBlockState struct {
 func New(stateReader StateReader) *IntraBlockState {
 	return &IntraBlockState{
 		stateReader:       stateReader,
-		stateObjects:      make(map[common.Address]*StateObject),
+		stateObjects:      make(map[common.Address]*stateObject),
 		stateObjectsDirty: make(map[common.Address]struct{}),
 		nilAccounts:       make(map[common.Address]struct{}),
 		logs:              make(map[common.Hash][]*types.Log),
@@ -105,7 +101,7 @@ func (sdb *IntraBlockState) Copy() *IntraBlockState {
 	// Copy all the basic fields, initialize the memory ones
 	ibs := &IntraBlockState{
 		stateReader:       sdb.stateReader,
-		stateObjects:      make(map[common.Address]*StateObject, len(sdb.journal.dirties)),
+		stateObjects:      make(map[common.Address]*stateObject, len(sdb.journal.dirties)),
 		stateObjectsDirty: make(map[common.Address]struct{}, len(sdb.journal.dirties)),
 		nilAccounts:       make(map[common.Address]struct{}),
 		refund:            sdb.refund,
@@ -176,7 +172,7 @@ func (sdb *IntraBlockState) Error() error {
 // Reset clears out all ephemeral state objects from the state db, but keeps
 // the underlying state trie to avoid reloading data for the next operations.
 func (sdb *IntraBlockState) Reset() {
-	sdb.stateObjects = make(map[common.Address]*StateObject)
+	sdb.stateObjects = make(map[common.Address]*stateObject)
 	sdb.stateObjectsDirty = make(map[common.Address]struct{})
 	sdb.thash = common.Hash{}
 	sdb.bhash = common.Hash{}
@@ -543,7 +539,7 @@ func (sdb *IntraBlockState) Suicide(addr common.Address) bool {
 }
 
 // Retrieve a state object given my the address. Returns nil if not found.
-func (sdb *IntraBlockState) getStateObject(addr common.Address) (stateObject *StateObject) {
+func (sdb *IntraBlockState) getStateObject(addr common.Address) (stateObject *stateObject) {
 	// Prefer 'live' objects.
 	if obj := sdb.stateObjects[addr]; obj != nil {
 		return obj
@@ -569,12 +565,12 @@ func (sdb *IntraBlockState) getStateObject(addr common.Address) (stateObject *St
 	return obj
 }
 
-func (sdb *IntraBlockState) setStateObject(object *StateObject) {
+func (sdb *IntraBlockState) setStateObject(object *stateObject) {
 	sdb.stateObjects[object.Address()] = object
 }
 
 // Retrieve a state object or create a new state object if nil.
-func (sdb *IntraBlockState) GetOrNewStateObject(addr common.Address) *StateObject {
+func (sdb *IntraBlockState) GetOrNewStateObject(addr common.Address) *stateObject {
 	stateObject := sdb.getStateObject(addr)
 	if stateObject == nil || stateObject.deleted {
 		stateObject = sdb.createObject(addr, nil /* previous */)
@@ -584,7 +580,7 @@ func (sdb *IntraBlockState) GetOrNewStateObject(addr common.Address) *StateObjec
 
 // createObject creates a new state object. If there is an existing account with
 // the given address, it is overwritten.
-func (sdb *IntraBlockState) createObject(addr common.Address, previous *StateObject) (newobj *StateObject) {
+func (sdb *IntraBlockState) createObject(addr common.Address, previous *stateObject) (newobj *stateObject) {
 	account := new(accounts.Account)
 	if previous != nil {
 		account.Balance.Set(&previous.data.Balance)
@@ -689,7 +685,7 @@ func (sdb *IntraBlockState) GetRefund() uint64 {
 	return sdb.refund
 }
 
-func updateAccount(EIP158Enabled bool, stateWriter StateWriter, addr common.Address, stateObject *StateObject, isDirty bool) error {
+func updateAccount(EIP158Enabled bool, stateWriter StateWriter, addr common.Address, stateObject *stateObject, isDirty bool) error {
 	emptyRemoval := EIP158Enabled && stateObject.empty()
 	if stateObject.suicided || (isDirty && emptyRemoval) {
 		if err := stateWriter.DeleteAccount(addr, &stateObject.original); err != nil {
@@ -720,7 +716,7 @@ func updateAccount(EIP158Enabled bool, stateWriter StateWriter, addr common.Addr
 	return nil
 }
 
-func printAccount(EIP158Enabled bool, addr common.Address, stateObject *StateObject, isDirty bool) {
+func printAccount(EIP158Enabled bool, addr common.Address, stateObject *stateObject, isDirty bool) {
 	emptyRemoval := EIP158Enabled && stateObject.empty()
 	if stateObject.suicided || (isDirty && emptyRemoval) {
 		fmt.Printf("delete: %x\n", addr)

@@ -491,11 +491,11 @@ func (pool *TxPool) Stats() (int, int) {
 func (pool *TxPool) stats() (int, int) {
 	pending := 0
 	for _, list := range pool.pending {
-		pending += len(list.txs.items)
+		pending += list.Len()
 	}
 	queued := 0
 	for _, list := range pool.queue {
-		queued += len(list.txs.items)
+		queued += list.Len()
 	}
 	return pending, queued
 }
@@ -1160,7 +1160,7 @@ func (pool *TxPool) runReorg(done chan struct{}, dirtyAccounts *accountSet, even
 		// Nonces were reset, discard any events that became stale
 		for addr := range events {
 			events[addr].Forward(pool.pendingNonces.get(addr))
-			if len(events[addr].items) == 0 {
+			if events[addr].Len() == 0 {
 				delete(events, addr)
 			}
 		}
@@ -1279,7 +1279,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []types.Transa
 func (pool *TxPool) truncatePending() {
 	pending := uint64(0)
 	for _, list := range pool.pending {
-		pending += uint64(len(list.txs.items))
+		pending += uint64(list.Len())
 	}
 	if pending <= pool.config.GlobalSlots {
 		return
@@ -1304,14 +1304,14 @@ func (pool *TxPool) truncatePending() {
 		// Equalize balances until all the same or below threshold
 		if len(offenders) > 1 {
 			// Calculate the equalization threshold for all current offenders
-			threshold := len(pool.pending[offender.(common.Address)].txs.items)
+			threshold := pool.pending[offender.(common.Address)].Len()
 
 			// Iteratively reduce all offenders until below limit or threshold reached
 			for pending > pool.config.GlobalSlots && pool.pending[offenders[len(offenders)-2]].Len() > threshold {
 				for i := 0; i < len(offenders)-1; i++ {
 					list := pool.pending[offenders[i]]
 
-					caps := list.Cap(len(list.txs.items) - 1)
+					caps := list.Cap(list.Len() - 1)
 					for _, tx := range caps {
 						// Drop the transaction from the global pools too
 						hash := tx.Hash()
@@ -1334,11 +1334,11 @@ func (pool *TxPool) truncatePending() {
 
 	// If still above threshold, reduce to limit or min allowance
 	if pending > pool.config.GlobalSlots && len(offenders) > 0 {
-		for pending > pool.config.GlobalSlots && uint64(len(pool.pending[offenders[len(offenders)-1]].txs.items)) > pool.config.AccountSlots {
+		for pending > pool.config.GlobalSlots && uint64(pool.pending[offenders[len(offenders)-1]].Len()) > pool.config.AccountSlots {
 			for _, addr := range offenders {
 				list := pool.pending[addr]
 
-				caps := list.Cap(len(list.txs.items) - 1)
+				caps := list.Cap(list.Len() - 1)
 				for _, tx := range caps {
 					// Drop the transaction from the global pools too
 					hash := tx.Hash()
@@ -1364,7 +1364,7 @@ func (pool *TxPool) truncatePending() {
 func (pool *TxPool) truncateQueue() {
 	queued := uint64(0)
 	for _, list := range pool.queue {
-		queued += uint64(len(list.txs.items))
+		queued += uint64(list.Len())
 	}
 	if queued <= pool.config.GlobalQueue {
 		return
@@ -1387,7 +1387,7 @@ func (pool *TxPool) truncateQueue() {
 		addresses = addresses[:len(addresses)-1]
 
 		// Drop all transactions if they are less than the overflow
-		if size := uint64(len(list.txs.items)); size <= drop {
+		if size := uint64(list.Len()); size <= drop {
 			for _, tx := range list.Flatten() {
 				pool.removeTxLocked(tx.Hash(), true)
 			}
@@ -1444,7 +1444,7 @@ func (pool *TxPool) demoteUnexecutables() {
 			localGauge.Add(-(len(olds) + len(drops) + len(invalids)))
 		}
 		// If there's a gap in front, alert (should never happen) and postpone all transactions
-		if len(list.txs.items) > 0 && list.txs.Get(nonce) == nil {
+		if list.Len() > 0 && list.txs.Get(nonce) == nil {
 			gapped := list.Cap(0)
 			for _, tx := range gapped {
 				hash := tx.Hash()

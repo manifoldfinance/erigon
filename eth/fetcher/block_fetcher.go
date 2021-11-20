@@ -32,14 +32,13 @@ import (
 )
 
 const (
-	arriveTimeout       = 500 * time.Millisecond // Time allowance before an announced block/transaction is explicitly requested
-	gatherSlack         = 100 * time.Millisecond // Interval used to collate almost-expired announces with fetches
-	fetchTimeout        = 5 * time.Second        // Maximum allotted time to return an explicitly requested block/transaction
-	reQueueBlockTimeout = 500 * time.Millisecond // Time allowance before blocks are requeued for import
+	arriveTimeout = 500 * time.Millisecond // Time allowance before an announced block/transaction is explicitly requested
+	gatherSlack   = 100 * time.Millisecond // Interval used to collate almost-expired announces with fetches
+	fetchTimeout  = 5 * time.Second        // Maximum allotted time to return an explicitly requested block/transaction
 )
 
 const (
-	maxUncleDist = 11  // Maximum allowed backward distance from the chain head
+	maxUncleDist = 7   // Maximum allowed backward distance from the chain head
 	maxQueueDist = 32  // Maximum allowed distance from the chain head to queue
 	hashLimit    = 256 // Maximum number of unique blocks or headers a peer may have announced
 	blockLimit   = 64  // Maximum number of unique blocks a peer may have delivered
@@ -162,8 +161,6 @@ type BlockFetcher struct {
 	bodyFilter   chan chan *bodyFilterTask
 
 	quit chan struct{}
-
-	requeue chan *blockOrHeaderInject
 
 	// Announce states
 	announces  map[string]int                   // Per peer announce counts to prevent memory exhaustion
@@ -370,7 +367,7 @@ func (f *BlockFetcher) loop() {
 				f.forgetBlock(hash)
 				continue
 			}
-			f.importBlocks(op)
+			f.importBlocks(op.origin, op.block)
 		}
 		// Wait for an outside event to occur
 		select {
@@ -414,21 +411,6 @@ func (f *BlockFetcher) loop() {
 			if len(f.announcedS) == 1 {
 				f.rescheduleFetch(fetchTimer)
 			}
-
-		case op := <-f.requeue:
-			// Re-queue blocks that have not been written due to fork block competition
-			number := int64(0)
-			hash := ""
-			if op.header != nil {
-				number = op.header.Number.Int64()
-				hash = op.header.Hash().String()
-			} else if op.block != nil {
-				number = op.block.Number().Int64()
-				hash = op.block.Hash().String()
-			}
-
-			log.Info("Re-queue blocks", "number", number, "hash", hash)
-			f.enqueue(op.origin, op.header, op.block)
 
 		case op := <-f.inject:
 			// A direct block insertion was requested, try and fill any pending gaps
@@ -740,9 +722,7 @@ func (f *BlockFetcher) enqueue(peer string, header *types.Header, block *types.B
 // importBlocks spawns a new goroutine to run a block insertion into the chain. If the
 // block's number is at the same height as the current import phase, it updates
 // the phase states accordingly.
-func (f *BlockFetcher) importBlocks(op *blockOrHeaderInject) {
-	peer := op.origin
-	block := op.block
+func (f *BlockFetcher) importBlocks(peer string, block *types.Block) {
 	hash := block.Hash()
 
 	// Run the import on a new thread

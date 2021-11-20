@@ -151,11 +151,6 @@ func ApplyTransaction(config *params.ChainConfig, getHeader func(hash common.Has
 		}
 	}
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, ibs, config, cfg)
-	defer func() {
-		ite := vmenv.Interpreter()
-		vm.EVMInterpreterPool.Put(ite)
-		vm.EvmPool.Put(vmenv)
-	}()
 	// Add addresses to access list if applicable
 	// about the transaction and calling mechanisms.
 	cfg.SkipAnalysis = SkipAnalysis(config, header.Number.Uint64())

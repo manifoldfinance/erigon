@@ -96,14 +96,6 @@ var (
 		Usage: "Data directory for the databases",
 		Value: DirectoryString(paths.DefaultDataDir()),
 	}
-	DirectBroadcastFlag = cli.BoolFlag{
-		Name:  "directbroadcast",
-		Usage: "Enable directly broadcast mined block to all peers",
-	}
-	RangeLimitFlag = cli.BoolFlag{
-		Name:  "rangelimit",
-		Usage: "Enable 5000 blocks limit for range query",
-	}
 	MdbxAugmentLimitFlag = DirectoryFlag{
 		Name:  "mdbx.augment.limit",
 		Usage: "Data directory for the databases",
@@ -540,31 +532,6 @@ var (
 		Usage: "a path to clique db folder",
 		Value: "",
 	}
-
-	// Init network
-	InitNetworkSize = cli.IntFlag{
-		Name:  "init.size",
-		Usage: "the size of the network",
-		Value: 1,
-	}
-
-	InitNetworkDir = cli.StringFlag{
-		Name:  "init.dir",
-		Usage: "the direction to store initial network data",
-		Value: "",
-	}
-
-	InitNetworkIps = cli.StringFlag{
-		Name:  "init.ips",
-		Usage: "the ips of each node in the network, example '192.168.0.1,192.168.0.2'",
-		Value: "",
-	}
-
-	InitNetworkPort = cli.IntFlag{
-		Name:  "init.p2p-port",
-		Usage: "the p2p port of the nodes in the network",
-		Value: 30311,
-	}
 )
 
 var MetricFlags = []cli.Flag{MetricsEnabledFlag, MetricsEnabledExpensiveFlag, MetricsHTTPFlag, MetricsPortFlag}
@@ -916,13 +883,6 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setDataDir(ctx, cfg)
 	setNodeUserIdent(ctx, cfg)
 	SetP2PConfig(ctx, &cfg.P2P, cfg.NodeName(), cfg.DataDir)
-
-	if ctx.GlobalIsSet(DirectBroadcastFlag.Name) {
-		cfg.DirectBroadcast = ctx.GlobalBool(DirectBroadcastFlag.Name)
-	}
-	if ctx.GlobalIsSet(RangeLimitFlag.Name) {
-		cfg.RangeLimit = ctx.GlobalBool(RangeLimitFlag.Name)
-	}
 }
 
 func SetNodeConfigCobra(cmd *cobra.Command, cfg *node.Config) {
@@ -1288,18 +1248,8 @@ func SetEthConfig(ctx *cli.Context, nodeConfig *node.Config, cfg *ethconfig.Conf
 			cfg.EthDiscoveryURLs = SplitAndTrim(urls)
 		}
 	}
-
-	if ctx.GlobalIsSet(DirectBroadcastFlag.Name) {
-		cfg.DirectBroadcast = ctx.GlobalBool(DirectBroadcastFlag.Name)
-	}
-	if ctx.GlobalIsSet(RangeLimitFlag.Name) {
-		cfg.RangeLimit = ctx.GlobalBool(RangeLimitFlag.Name)
-	}
-
-
 	// Override any default configs for hard coded networks.
 	chain := ctx.GlobalString(ChainFlag.Name)
-	log.Info("Chain:", chain)
 	switch chain {
 	case "":
 		if cfg.NetworkID == 1 {

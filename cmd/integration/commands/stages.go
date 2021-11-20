@@ -1045,9 +1045,14 @@ func newSync(ctx context.Context, db kv.RwDB, miningConfig *params.MiningConfig)
 	engine = ethash.NewFaker()
 
 	switch chain {
-	// todo bk: skipping since we're only worrying about BSC
-	// case params.SokolChainName, params.KovanChainName:
-	// 	engine = ethconfig.CreateConsensusEngine(chainConfig, logger, &params.AuRaConfig{DBPath: path.Join(datadir, "aura")}, nil, false)
+	case params.SokolChainName, params.KovanChainName:
+		config := &ethconfig.Defaults
+		var consensusConfig interface{}
+		if chainConfig.Aura != nil {
+			consensusConfig = &params.AuRaConfig{DBPath: path.Join(datadir, "aura")}
+		}
+		engine = ethconfig.CreateConsensusEngine(chainConfig, logger, consensusConfig, config.Miner.Notify, config.Miner.Noverify, nil, common.Hash{})
+
 	case params.BSCMainnetChainName:
 		config := &ethconfig.Defaults
 		var consensusConfig interface{}

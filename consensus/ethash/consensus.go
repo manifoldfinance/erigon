@@ -625,10 +625,6 @@ func (ethash *Ethash) FinalizeAndAssemble(chainConfig *params.ChainConfig, heade
 	return types.NewBlock2(header, txs, uncles, r), r, nil
 }
 
-func (ethash *Ethash) Delay(_ consensus.ChainReader, _ *types.Header) *time.Duration {
-	return nil
-}
-
 // SealHash returns the hash of a block prior to it being sealed.
 func (ethash *Ethash) SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()

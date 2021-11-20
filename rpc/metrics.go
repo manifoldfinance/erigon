@@ -19,26 +19,19 @@ package rpc
 import (
 	"fmt"
 
-	victoriaMetrics "github.com/VictoriaMetrics/metrics"
-	"github.com/ledgerwatch/erigon/metrics"
+	"github.com/VictoriaMetrics/metrics"
 )
 
 var (
-	rpcRequestGauge    = victoriaMetrics.GetOrCreateCounter("rpc_total")
-	failedReqeustGauge = victoriaMetrics.GetOrCreateCounter("rpc_failure")
-	RpcServingTimer    = metrics.NewRegisteredTimer("rpc/duration/all", nil)
+	rpcRequestGauge    = metrics.GetOrCreateCounter("rpc_total")
+	failedReqeustGauge = metrics.GetOrCreateCounter("rpc_failure")
 )
 
-func newRPCServingTimerMS(method string, valid bool) *victoriaMetrics.Summary {
+func newRPCServingTimerMS(method string, valid bool) *metrics.Summary {
 	flag := "success"
 	if !valid {
 		flag = "failure"
 	}
 	m := fmt.Sprintf(`rpc_duration_seconds{method="%s",success="%s"}`, method, flag)
-	return victoriaMetrics.GetOrCreateSummary(m)
-}
-
-func newRPCRequestGauge(method string) metrics.Gauge {
-	m := fmt.Sprintf("rpc/count/%s", method)
-	return metrics.GetOrRegisterGauge(m, nil)
+	return metrics.GetOrCreateSummary(m)
 }

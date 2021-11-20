@@ -19,7 +19,6 @@ package filters
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/ledgerwatch/erigon/common"
@@ -30,8 +29,6 @@ import (
 	"github.com/ledgerwatch/erigon/rpc"
 	"github.com/ledgerwatch/log/v3"
 )
-
-const maxFilterBlockRange = 5000
 
 type Backend interface {
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
@@ -60,13 +57,11 @@ type Filter struct {
 	begin, end int64       // Range interval if filtering multiple blocks
 
 	matcher *bloombits.Matcher
-
-	rangeLimit bool
 }
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash, rangeLimit bool) *Filter {
+func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
 	log.Error("Log filter not used in Erigon, please see implementation of eth_getLogs in RPCDaemon for more details")
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
@@ -94,7 +89,6 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
 	filter.end = end
-	filter.rangeLimit = rangeLimit
 
 	return filter
 }
@@ -145,9 +139,6 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	end := uint64(f.end)
 	if f.end == -1 {
 		end = head
-	}
-	if f.rangeLimit && (int64(end)-f.begin) > maxFilterBlockRange {
-		return nil, fmt.Errorf("exceed maximum block range: %d", maxFilterBlockRange)
 	}
 	// Gather all indexed logs, and finish with non indexed ones
 	var (

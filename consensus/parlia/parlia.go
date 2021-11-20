@@ -20,7 +20,6 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon"
-	"github.com/ledgerwatch/erigon/accounts"
 	"github.com/ledgerwatch/erigon/accounts/abi"
 	// "github.com/ledgerwatch/erigon/cmd/rpcdaemon"
 	"github.com/ledgerwatch/erigon/common"
@@ -33,6 +32,7 @@ import (
 	"github.com/ledgerwatch/erigon/core/state"
 	"github.com/ledgerwatch/erigon/core/systemcontracts"
 	"github.com/ledgerwatch/erigon/core/types"
+	"github.com/ledgerwatch/erigon/core/types/accounts"
 	"github.com/ledgerwatch/erigon/core/vm"
 	"github.com/ledgerwatch/erigon/crypto"
 	// "github.com/ledgerwatch/erigon/ethdb"
@@ -146,9 +146,9 @@ var (
 
 // SignerFn is a signer callback function to request a header to be signed by a
 // backing account.
-type SignerFn func(accounts.Account, string, []byte) ([]byte, error)
-type SignerTxFn func(accounts.Account, *types.Transaction, *big.Int) (*types.Transaction, error)
-type SignerTxFnLegacy func(accounts.Account, *types.LegacyTx, *big.Int) (*types.LegacyTx, error)
+type SignerFn func(common.Address, string, []byte) ([]byte, error)
+type SignerTxFn func(common.Address, *types.Transaction, *big.Int) (*types.Transaction, error)
+type SignerTxFnLegacy func(common.Address, *types.LegacyTx, *big.Int) (*types.LegacyTx, error)
 
 func isToSystemContract(to common.Address) bool {
 	return systemContracts[to]
@@ -810,16 +810,6 @@ func (p *Parlia) Authorize(val common.Address, signFn SignerFn, signTxFn SignerT
 	p.signTxFn = signTxFn
 }
 
-func (p *Parlia) Delay(chain consensus.ChainReader, header *types.Header) *time.Duration {
-	number := header.Number.Uint64()
-	snap, err := p.snapshot(chain, number-1, header.ParentHash, nil)
-	if err != nil {
-		return nil
-	}
-	delay := p.delayForRamanujanFork(snap, header)
-	return &delay
-}
-
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
 func (p *Parlia) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
@@ -867,7 +857,7 @@ func (p *Parlia) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	log.Info("Sealing block with", "number", number, "delay", delay, "headerDifficulty", header.Difficulty, "val", val.Hex())
 
 	// Sign all the things!
-	sig, err := signFn(accounts.Account{Address: val}, accounts.MimetypeParlia, ParliaRLP(header, p.chainConfig.ChainID))
+	sig, err := signFn(val, accounts.MimetypeParlia, ParliaRLP(header, p.chainConfig.ChainID))
 	if err != nil {
 		return err
 	}
@@ -1156,7 +1146,7 @@ func (p *Parlia) applyTransaction(
 
 	expectedHash := p.signer.Hash(expectedTx)
 	if msg.From() == p.val && mining {
-		expectedTx, err = p.signTxFnLegacy(accounts.Account{Address: msg.From()}, initExpectedTx, p.chainConfig.ChainID)
+		expectedTx, err = p.signTxFnLegacy(msg.From(), initExpectedTx, p.chainConfig.ChainID)
 		if err != nil {
 			return err
 		}

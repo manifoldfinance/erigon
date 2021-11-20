@@ -1262,10 +1262,6 @@ func (c *AuRa) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	}
 }
 
-func (c *AuRa) Delay(_ consensus.ChainReader, _ *types.Header) *time.Duration {
-	return nil
-}
-
 //nolint
 func (c *AuRa) emptySteps(fromStep, toStep uint64, parentHash common.Hash) []EmptyStep {
 	from := EmptyStep{step: fromStep + 1, parentHash: parentHash}

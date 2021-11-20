@@ -2,19 +2,12 @@ module github.com/ledgerwatch/erigon
 
 go 1.16
 
-replace github.com/ledgerwatch/erigon-lib v0.0.0-20211119150055-bb1d712834f0 => /Users/brendan/code/go/erigon-lib
-
 require (
-	crawshaw.io/sqlite v0.3.3-0.20210127221821-98b1f83c5508 // indirect
-	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/RoaringBitmap/roaring v0.9.4
 	github.com/VictoriaMetrics/fastcache v1.7.0
 	github.com/VictoriaMetrics/metrics v1.18.1
-	github.com/anacrolix/envpprof v1.1.1 // indirect
-	github.com/anacrolix/go-libutp v1.0.4 // indirect
 	github.com/anacrolix/log v0.10.0
 	github.com/anacrolix/torrent v1.35.0
-	github.com/anacrolix/utp v0.1.0 // indirect
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/c2h5oh/datasize v0.0.0-20200825124411-48ed595a09d2
 	github.com/consensys/gnark-crypto v0.4.0
@@ -50,13 +43,10 @@ require (
 	github.com/ledgerwatch/secp256k1 v1.0.0
 	github.com/logrusorgru/aurora/v3 v3.0.0
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
-	github.com/panjf2000/ants/v2 v2.4.5
 	github.com/pelletier/go-toml v1.9.4
-	github.com/petar/GoLLRB v0.0.0-20190514000832-33fb24c13b99
 	github.com/quasilyte/go-ruleguard/dsl v0.3.6
 	github.com/rcrowley/go-metrics v0.0.0-20190826022208-cac0b30c2563 // indirect
 	github.com/rs/cors v1.8.0
-	github.com/rs/dnscache v0.0.0-20210201191234-295bba877686 // indirect
 	github.com/shirou/gopsutil/v3 v3.21.9
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
