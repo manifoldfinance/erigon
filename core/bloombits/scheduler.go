@@ -18,8 +18,6 @@ package bloombits
 
 import (
 	"sync"
-
-	"github.com/ledgerwatch/erigon/common/gopool"
 )
 
 // request represents a bloom retrieval task to prioritize and pull from the local
@@ -65,12 +63,12 @@ func (s *scheduler) run(sections chan uint64, dist chan *request, done chan []by
 
 	// Start the pipeline schedulers to forward between user -> distributor -> user
 	wg.Add(2)
-	gopool.Submit(func() {
+	go func() {
 		s.scheduleRequests(sections, dist, pend, quit, wg)
-	})
-	gopool.Submit(func() {
+	}()
+	go func() {
 		s.scheduleDeliveries(pend, done, quit, wg)
-	})
+	}()
 }
 
 // reset cleans up any leftovers from previous runs. This is required before a

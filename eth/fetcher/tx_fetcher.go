@@ -27,7 +27,6 @@ import (
 	libcommon "github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/debug"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/mclock"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/types"
@@ -800,14 +799,14 @@ func (f *TxFetcher) scheduleFetches(timer *mclock.Timer, timeout chan struct{}, 
 			//txRequestOutMeter.Mark(int64(len(hashes)))
 
 			p := peer
-			gopool.Submit(func() {
+			go func() {
 				// Try to fetch the transactions, but in case of a request
 				// failure (e.g. peer disconnected), reschedule the hashes.
 				if err := f.fetchTxs(p, hashes); err != nil {
 					//txRequestFailMeter.Mark(int64(len(hashes)))
 					f.Drop(p) //nolint:errcheck
 				}
-			})
+			}()
 		}
 	})
 	// If a new request was fired, schedule a timeout timer

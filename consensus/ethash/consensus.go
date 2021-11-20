@@ -30,7 +30,6 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/debug"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/math"
 	"github.com/ledgerwatch/erigon/common/u256"
 	"github.com/ledgerwatch/erigon/consensus"
@@ -143,7 +142,7 @@ func (ethash *Ethash) VerifyHeaders(chain consensus.ChainHeaderReader, headers [
 
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
-		gopool.Submit(func() {
+		go func() {
 			defer debug.LogPanic()
 			defer wg.Done()
 			var index int64
@@ -157,7 +156,7 @@ func (ethash *Ethash) VerifyHeaders(chain consensus.ChainHeaderReader, headers [
 					return
 				}
 			}
-		})
+		}()
 	}
 
 	wg.Wait()

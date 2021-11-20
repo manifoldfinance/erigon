@@ -24,7 +24,6 @@ import (
 	"github.com/ledgerwatch/erigon/accounts/abi"
 	// "github.com/ledgerwatch/erigon/cmd/rpcdaemon"
 	"github.com/ledgerwatch/erigon/common"
-	// "github.com/ledgerwatch/erigon/common/gopool"
 	// "github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/common/u256"
 	"github.com/ledgerwatch/erigon/consensus"
@@ -309,7 +308,7 @@ func (p *Parlia) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*typ
 	// abort := make(chan struct{})
 	// results := make(chan error, len(headers))
 
-	// gopool.Submit(func() {
+	// go func() {
 	// 	for i, header := range headers {
 	// 		err := p.verifyHeader(chain, header, headers[:i])
 
@@ -319,7 +318,7 @@ func (p *Parlia) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*typ
 	// 		case results <- err:
 	// 		}
 	// 	}
-	// })
+	// }()
 	// return abort, results
 	return nil
 }

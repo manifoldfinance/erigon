@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/node"
 	"github.com/ledgerwatch/erigon/p2p"
 	"github.com/ledgerwatch/erigon/p2p/enode"
@@ -131,7 +130,7 @@ func (p *pingPongService) Run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	log := p.log.New("peer.id", peer.ID())
 
 	errC := make(chan error)
-	gopool.Submit(func() {
+	go func() {
 		for range time.Tick(10 * time.Second) {
 			log.Info("sending ping")
 			if err := p2p.Send(rw, pingMsgCode, "PING"); err != nil {
@@ -139,8 +138,8 @@ func (p *pingPongService) Run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 				return
 			}
 		}
-	})
-	gopool.Submit(func() {
+	}()
+	go func() {
 		for {
 			msg, err := rw.ReadMsg()
 			if err != nil {
@@ -156,9 +155,9 @@ func (p *pingPongService) Run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 			atomic.AddInt64(&p.received, 1)
 			if msg.Code == pingMsgCode {
 				log.Info("sending pong")
-				gopool.Submit(func() { p2p.Send(rw, pongMsgCode, "PONG") })
+				go func() { p2p.Send(rw, pongMsgCode, "PONG") }()
 			}
 		}
-	})
+	}()
 	return <-errC
 }

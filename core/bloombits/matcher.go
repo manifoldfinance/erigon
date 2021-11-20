@@ -28,7 +28,6 @@ import (
 
 	"github.com/ledgerwatch/erigon/common/bitutil"
 	"github.com/ledgerwatch/erigon/common/debug"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/crypto"
 )
 
@@ -166,7 +165,7 @@ func (m *Matcher) Start(ctx context.Context, begin, end uint64, results chan uin
 
 	// Read the output from the result sink and deliver to the user
 	session.pend.Add(1)
-	gopool.Submit(func() {
+	go func() {
 		defer debug.LogPanic()
 		defer session.pend.Done()
 		defer close(results)
@@ -213,7 +212,7 @@ func (m *Matcher) Start(ctx context.Context, begin, end uint64, results chan uin
 				}
 			}
 		}
-	})
+	}()
 	return session, nil
 }
 
@@ -229,7 +228,7 @@ func (m *Matcher) run(begin, end uint64, buffer int, session *MatcherSession) ch
 	source := make(chan *partialMatches, buffer)
 
 	session.pend.Add(1)
-	gopool.Submit(func() {
+	go func() {
 		defer debug.LogPanic()
 		defer session.pend.Done()
 		defer close(source)
@@ -251,7 +250,7 @@ func (m *Matcher) run(begin, end uint64, buffer int, session *MatcherSession) ch
 	}
 	// Start the request distribution
 	session.pend.Add(1)
-	gopool.Submit(func() {
+	go func() {
 		m.distributor(dist, session)
 	})
 
@@ -279,7 +278,7 @@ func (m *Matcher) subMatch(source chan *partialMatches, dist chan *request, bloo
 	results := make(chan *partialMatches, cap(source))
 
 	session.pend.Add(2)
-	gopool.Submit(func() {
+	go func() {
 		// Tear down the goroutine and terminate all source channels
 		defer session.pend.Done()
 		defer close(process)
@@ -322,7 +321,7 @@ func (m *Matcher) subMatch(source chan *partialMatches, dist chan *request, bloo
 		}
 	})
 
-	gopool.Submit(func() {
+	go func() {
 		defer debug.LogPanic()
 		// Tear down the goroutine and terminate the final sink channel
 		defer session.pend.Done()

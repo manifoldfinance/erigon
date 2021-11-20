@@ -34,7 +34,6 @@ import (
 
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/debug"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/p2p/enode"
 	"github.com/ledgerwatch/erigon/p2p/netutil"
 	"github.com/ledgerwatch/log/v3"
@@ -232,9 +231,9 @@ func (tab *Table) loop() {
 	defer copyNodes.Stop()
 
 	// Start initial refresh.
-	gopool.Submit(func() {
+	go func() {
 		tab.doRefresh(refreshDone)
-	})
+	}()
 loop:
 	for {
 		select {
@@ -242,17 +241,17 @@ loop:
 			tab.seedRand()
 			if refreshDone == nil {
 				refreshDone = make(chan struct{})
-				gopool.Submit(func() {
+				go func() {
 					tab.doRefresh(refreshDone)
-				})
+				}()
 			}
 		case req := <-tab.refreshReq:
 			waiting = append(waiting, req)
 			if refreshDone == nil {
 				refreshDone = make(chan struct{})
-				gopool.Submit(func() {
+				go func() {
 					tab.doRefresh(refreshDone)
-				})
+				}()
 			}
 		case <-refreshDone:
 			for _, ch := range waiting {
@@ -261,16 +260,16 @@ loop:
 			waiting, refreshDone = nil, nil
 		case <-revalidate.C:
 			revalidateDone = make(chan struct{})
-			gopool.Submit(func() {
+			go func() {
 				tab.doRevalidate(revalidateDone)
-			})
+			}()
 		case <-revalidateDone:
 			revalidate.Reset(tab.nextRevalidateTime())
 			revalidateDone = nil
 		case <-copyNodes.C:
-			gopool.Submit(func() {
+			go func() {
 				tab.copyLiveNodes()
-			})
+			}()
 		case <-tab.closeReq:
 			break loop
 		}

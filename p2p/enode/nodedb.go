@@ -29,13 +29,10 @@ import (
 	"time"
 
 	"github.com/google/btree"
-
 	"github.com/c2h5oh/datasize"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon-lib/kv/mdbx"
-
 	"github.com/ledgerwatch/erigon/common"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/rlp"
 	"github.com/ledgerwatch/log/v3"
 )
@@ -446,9 +443,9 @@ func deleteRange(db *DB, prefix []byte) {
 // condition occurs (i.e. a successful bonding), and discard further events.
 func (db *DB) ensureExpirer() {
 	db.runner.Do(func() {
-		gopool.Submit(func() {
+		go func() {
 			db.expirer()
-		})
+		}()
 	})
 }
 

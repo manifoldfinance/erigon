@@ -31,7 +31,6 @@ import (
 
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/bitutil"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/debug"
 	"github.com/ledgerwatch/erigon/crypto"
 	"github.com/ledgerwatch/log/v3"
@@ -193,7 +192,7 @@ func generateCache(dest []uint32, epoch uint64, seed []byte) {
 	done := make(chan struct{})
 	defer close(done)
 
-	gopool.Submit(func() {
+	go func() {
 		for {
 			select {
 			case <-done:
@@ -202,7 +201,7 @@ func generateCache(dest []uint32, epoch uint64, seed []byte) {
 				logger.Info("Generating ethash verification cache", "percentage", atomic.LoadUint32(&progress)*100/uint32(rows)/4, "elapsed", common.PrettyDuration(time.Since(start)))
 			}
 		}
-	})
+	}()
 	// Create a hasher to reuse between invocations
 	keccak512 := makeHasher(sha3.NewLegacyKeccak512())
 

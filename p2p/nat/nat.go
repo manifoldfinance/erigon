@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/log/v3"
 
 	natpmp "github.com/jackpal/go-nat-pmp"
@@ -147,8 +146,8 @@ func Any() Interface {
 	// Internet-class address. Return ExtIP in this case.
 	return startautodisc("UPnP or NAT-PMP", func() Interface {
 		found := make(chan Interface, 2)
-		gopool.Submit(func() { found <- discoverUPnP() })
-		gopool.Submit(func() { found <- discoverPMP() })
+		go func() { found <- discoverUPnP() }()
+		go func() { found <- discoverPMP() }()
 		for i := 0; i < cap(found); i++ {
 			if c := <-found; c != nil {
 				return c

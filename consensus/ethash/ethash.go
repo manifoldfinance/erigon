@@ -33,10 +33,8 @@ import (
 
 	"github.com/edsrzf/mmap-go"
 	"github.com/hashicorp/golang-lru/simplelru"
-
 	"github.com/ledgerwatch/erigon/common/debug"
 	"github.com/ledgerwatch/erigon/consensus"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/metrics"
 	"github.com/ledgerwatch/erigon/rpc"
 	"github.com/ledgerwatch/log/v3"
@@ -528,7 +526,7 @@ func (ethash *Ethash) dataset(block uint64, async bool) *dataset {
 
 	// If async is specified, generate everything in a background thread
 	if async && !current.generated() {
-		gopool.Submit(func() {
+		go func() {
 			defer debug.LogPanic()
 			current.generate(ethash.config.DatasetDir, ethash.config.DatasetsOnDisk, ethash.config.DatasetsLockMmap, ethash.config.PowMode == ModeTest)
 
@@ -536,7 +534,7 @@ func (ethash *Ethash) dataset(block uint64, async bool) *dataset {
 				future := futureI.(*dataset)
 				future.generate(ethash.config.DatasetDir, ethash.config.DatasetsOnDisk, ethash.config.DatasetsLockMmap, ethash.config.PowMode == ModeTest)
 			}
-		})
+		}()
 	} else {
 		// Either blocking generation was requested, or already done
 		current.generate(ethash.config.DatasetDir, ethash.config.DatasetsOnDisk, ethash.config.DatasetsLockMmap, ethash.config.PowMode == ModeTest)

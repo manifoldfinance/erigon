@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	_debug "github.com/ledgerwatch/erigon/common/debug"
-	"github.com/ledgerwatch/erigon/common/gopool"
 	"github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/crypto"
 	"github.com/ledgerwatch/erigon/internal/debug"
@@ -142,7 +141,7 @@ func (api *privateAdminAPI) PeerEvents(ctx context.Context) (*rpc.Subscription, 
 	}
 	rpcSub := notifier.CreateSubscription()
 
-	gopool.Submit(func() {
+	go func() {
 		defer _debug.LogPanic()
 		events := make(chan *p2p.PeerEvent)
 		sub := server.SubscribeEvents(events)
@@ -160,7 +159,7 @@ func (api *privateAdminAPI) PeerEvents(ctx context.Context) (*rpc.Subscription, 
 				return
 			}
 		}
-	})
+	}()
 
 	return rpcSub, nil
 }
