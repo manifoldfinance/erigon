@@ -129,6 +129,7 @@ func applyTransaction(config *params.ChainConfig, gp *GasPool, statedb *state.In
 		// Set the receipt logs and create a bloom for filtering
 		receipt.Logs = statedb.GetLogs(tx.Hash())
 		receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+		receipt.BlockHash = statedb.BlockHash()
 		receipt.BlockNumber = header.Number
 		receipt.TransactionIndex = uint(statedb.TxIndex())
 	}
@@ -141,7 +142,6 @@ func applyTransaction(config *params.ChainConfig, gp *GasPool, statedb *state.In
 // indicating the block was invalid.
 func ApplyTransaction(config *params.ChainConfig, getHeader func(hash common.Hash, number uint64) *types.Header, engine consensus.Engine, author *common.Address, gp *GasPool, ibs *state.IntraBlockState, stateWriter state.StateWriter, header *types.Header, tx types.Transaction, usedGas *uint64, cfg vm.Config, contractHasTEVM func(contractHash common.Hash) (bool, error)) (*types.Receipt, []byte, error) {
 	// Create a new context to be used in the EVM environment
-
 	var vmenv vm.VMInterface
 
 	if tx.IsStarkNet() {
@@ -149,6 +149,14 @@ func ApplyTransaction(config *params.ChainConfig, getHeader func(hash common.Has
 	} else {
 		blockContext := NewEVMBlockContext(header, getHeader, engine, author, contractHasTEVM)
 		vmenv = vm.NewEVM(blockContext, vm.TxContext{}, ibs, config, cfg)
+	}
+
+	posa, isPoSA := engine.(consensus.PoSA)
+	if isPoSA {
+		isSystemTx, err := posa.IsSystemTransaction(&tx, header)
+		if isSystemTx || err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Add addresses to access list if applicable

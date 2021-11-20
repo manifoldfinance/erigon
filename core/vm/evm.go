@@ -19,6 +19,7 @@ package vm
 import (
 	"errors"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +33,12 @@ import (
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
 // deployed contract addresses (relevant after the account abstraction).
 var emptyCodeHash = crypto.Keccak256Hash(nil)
+
+var EvmPool = sync.Pool{
+	New: func() interface{} {
+		return &EVM{}
+	},
+}
 
 type (
 	// CanTransferFunc is the signature of a transfer guard function

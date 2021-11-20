@@ -46,6 +46,7 @@ type Config struct {
 	Default          *big.Int `toml:",omitempty"`
 	MaxPrice         *big.Int `toml:",omitempty"`
 	IgnorePrice      *big.Int `toml:",omitempty"`
+	OracleThreshold  int      `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -67,6 +68,9 @@ type Oracle struct {
 	maxPrice    *big.Int
 	ignorePrice *big.Int
 	cacheLock   sync.RWMutex
+
+	defaultPrice      *big.Int
+	sampleTxThreshold int
 
 	checkBlocks                       int
 	percentile                        int
@@ -101,14 +105,16 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle ignore price", "provided", params.IgnorePrice, "updated", ignorePrice)
 	}
 	return &Oracle{
-		backend:          backend,
-		lastPrice:        params.Default,
-		maxPrice:         maxPrice,
-		ignorePrice:      ignorePrice,
-		checkBlocks:      blocks,
-		percentile:       percent,
-		maxHeaderHistory: params.MaxHeaderHistory,
-		maxBlockHistory:  params.MaxBlockHistory,
+		backend:           backend,
+		lastPrice:         params.Default,
+		maxPrice:          maxPrice,
+		ignorePrice:       ignorePrice,
+		checkBlocks:       blocks,
+		percentile:        percent,
+		maxHeaderHistory:  params.MaxHeaderHistory,
+		maxBlockHistory:   params.MaxBlockHistory,
+		defaultPrice:      params.Default,
+		sampleTxThreshold: params.OracleThreshold,
 	}
 }
 

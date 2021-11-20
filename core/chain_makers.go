@@ -26,6 +26,7 @@ import (
 	"github.com/ledgerwatch/erigon/consensus"
 	"github.com/ledgerwatch/erigon/consensus/misc"
 	"github.com/ledgerwatch/erigon/core/state"
+	systemcontracts "github.com/ledgerwatch/erigon/core/systemcontracts/parlia"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
 	"github.com/ledgerwatch/erigon/params"
@@ -279,6 +280,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
 			misc.ApplyDAOHardFork(ibs)
 		}
+		systemcontracts.UpgradeBuildInSystemContract(config, b.header.Number, ibs)
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)
